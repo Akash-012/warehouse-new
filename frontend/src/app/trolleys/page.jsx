@@ -2,7 +2,7 @@
 export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -11,6 +11,8 @@ import PageHeader from '@/components/PageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import api from '@/lib/api';
 import {
   Table,
@@ -20,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Truck, Plus, Minus, Search, Inbox, Link2 } from 'lucide-react';
+import { Truck, Plus, Minus, Search, Inbox, Link2, List } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 
 const createSchema = z.object({
@@ -38,6 +40,14 @@ const assignSchema = z.object({
 export default function TrolleysPage() {
   const [lookupBarcode, setLookupBarcode] = useState('');
   const [compartmentContents, setCompartmentContents] = useState(null);
+
+  // Fetch all trolleys for the list
+  const { data: trolleyList, isLoading: listLoading } = useQuery({
+    queryKey: ['trolleys-list'],
+    queryFn: () => api.get('/trolleys').then((r) => r.data ?? []),
+    staleTime: 15_000,
+    retry: false,
+  });
 
   const {
     register: regCreate,
@@ -100,10 +110,44 @@ export default function TrolleysPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Trolleys"
-        description="Create trolleys, assign compartments to orders, and view contents."
-      />
+      <PageHeader title="Trolleys" description="Create trolleys, assign compartments to orders, and view contents." />
+      {/* Trolley List */}
+      <div className="glass-card rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <List className="size-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">All Trolleys</h2>
+          <Badge variant="outline" className="ml-auto">{trolleyList?.length ?? 0} trolleys</Badge>
+        </div>
+        {listLoading ? (
+          <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : (trolleyList?.length ?? 0) === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-8 text-muted-foreground">
+            <Truck className="size-8 opacity-30" />
+            <p className="text-sm">No trolleys yet — create one below</p>
+          </div>
+        ) : (
+          <div className="overflow-auto max-h-48 rounded-xl border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Barcode</TableHead>
+                  <TableHead>Compartments</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {trolleyList.map((t) => (
+                  <TableRow key={t.id ?? t.barcode} className="table-row-hover">
+                    <TableCell className="font-mono text-sm font-medium text-primary">{t.barcode ?? t.trolleyBarcode}</TableCell>
+                    <TableCell className="text-sm">{t.compartmentCount ?? t.compartments?.length ?? '—'}</TableCell>
+                    <TableCell><StatusBadge status={t.status ?? 'IDLE'} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Create trolley */}

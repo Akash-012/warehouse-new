@@ -91,7 +91,7 @@ export function ScanInput({
   const [showDrop,  setShowDrop]    = React.useState(false);
   const [history,   setHistory]     = React.useState<string[]>([]);
   const inputRef                    = React.useRef<HTMLInputElement>(null);
-  const clearTimer                  = React.useRef<ReturnType<typeof setTimeout>>();
+  const clearTimer                  = React.useRef<ReturnType<typeof setTimeout>>(undefined);
 
   /* Sync external scanResult */
   React.useEffect(() => {

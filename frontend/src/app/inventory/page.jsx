@@ -1,8 +1,8 @@
 'use client';
 
 import { useMemo, useState, useCallback } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Download, Search, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, X } from 'lucide-react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Download, Search, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, X, Sliders } from 'lucide-react';
 import { format } from 'date-fns';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -15,6 +15,10 @@ import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -76,12 +80,16 @@ function exportToExcel(items) {
 }
 
 export default function InventoryPage() {
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState('');
   const [state, setState] = useState('');
   const [warehouse, setWarehouse] = useState('ALL');
   const [sortField, setSortField] = useState('');
   const [sortDir, setSortDir] = useState('asc');
+  const [adjustItem, setAdjustItem] = useState(null);
+  const [adjustQty, setAdjustQty] = useState('');
+  const [adjustReason, setAdjustReason] = useState('CYCLE_COUNT');
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['inventory', { page, search, state, warehouse }],
@@ -116,11 +124,23 @@ export default function InventoryPage() {
   const clearFilters = () => { setSearch(''); setState(''); setWarehouse('ALL'); setPage(0); };
   const hasFilters = search || state || warehouse !== 'ALL';
 
+  const adjustMutation = useMutation({
+    mutationFn: ({ id, quantity, reason }) => api.post('/inventory/adjust', { inventoryId: id, quantity: Number(quantity), reason }),
+    onSuccess: () => {
+      toast.success('Stock adjusted successfully');
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      setAdjustItem(null);
+      setAdjustQty('');
+    },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to adjust stock'),
+  });
+
   return (
     <div className="space-y-6">
       <PageHeader
         title="Inventory"
         description="Search and manage live stock across all warehouse locations."
+        breadcrumbs={[{ label: 'Inventory' }]}
         actions={
           <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching}>
@@ -134,6 +154,45 @@ export default function InventoryPage() {
           </div>
         }
       />
+
+      {/* Adjust Stock Dialog */}
+      <Dialog open={!!adjustItem} onOpenChange={(v) => !v && setAdjustItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Adjust Stock</DialogTitle>
+            <DialogDescription>
+              Adjust quantity for <span className="font-mono font-semibold">{adjustItem?.barcode}</span> (SKU: {adjustItem?.skuCode ?? adjustItem?.sku})
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>New Quantity</Label>
+              <Input type="number" min={0} value={adjustQty} onChange={(e) => setAdjustQty(e.target.value)} placeholder="Enter new quantity" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Reason</Label>
+              <Select value={adjustReason} onValueChange={setAdjustReason}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="CYCLE_COUNT">Cycle Count</SelectItem>
+                  <SelectItem value="DAMAGE">Damage / Write-off</SelectItem>
+                  <SelectItem value="CORRECTION">Data Correction</SelectItem>
+                  <SelectItem value="RETURN">Customer Return</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAdjustItem(null)}>Cancel</Button>
+            <Button
+              disabled={!adjustQty || adjustMutation.isPending}
+              onClick={() => adjustMutation.mutate({ id: adjustItem.id, quantity: adjustQty, reason: adjustReason })}
+            >
+              Apply Adjustment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card className="glass-card rounded-[2rem] py-5">
         <CardContent className="space-y-4">
@@ -206,6 +265,7 @@ export default function InventoryPage() {
                   <TableHead>Batch</TableHead>
                   <SortableHead field="quantity"  label="Qty"      sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortableHead field="updatedAt" label="Updated"  sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -226,12 +286,17 @@ export default function InventoryPage() {
                       <TableCell><StatusBadge status={item.state} /></TableCell>
                       <TableCell className="text-muted-foreground">{item.batchNo ?? item.batch ?? 'Ã¢â‚¬â€'}</TableCell>
                       <TableCell className="font-semibold">{item.quantity}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM HH:mm') : 'Ã¢â‚¬â€'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM HH:mm') : 'Ã¢â‚¬â€'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setAdjustItem(item); setAdjustQty(String(item.quantity ?? '')); }}>
+                          <Sliders className="size-3 mr-1" /> Adjust
+                        </Button>
+                      </TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-40 text-center text-muted-foreground">
+                    <TableCell colSpan={8} className="h-40 text-center text-muted-foreground">
                       No inventory matched the current filters.
                     </TableCell>
                   </TableRow>

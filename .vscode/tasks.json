@@ -2,15 +2,47 @@
 	"version": "2.0.0",
 	"tasks": [
 		{
-			"label": "build",
+			"label": "backend: run",
 			"type": "shell",
-			"command": "msbuild",
-			"args": [
-				"/property:GenerateFullPaths=true",
-				"/t:build",
-				"/consoleloggerparameters:NoSummary"
-			],
-			"group": "build"
+			"command": "mvn spring-boot:run",
+			"options": {
+				"cwd": "${workspaceFolder}/backend",
+				"env": {
+					"MAVEN_OPTS": "-Xms256m -Xmx512m"
+				}
+			},
+			"group": "build",
+			"presentation": { "panel": "dedicated", "reveal": "always" }
+		},
+		{
+			"label": "backend: build",
+			"type": "shell",
+			"command": "mvn clean package -DskipTests",
+			"options": {
+				"cwd": "${workspaceFolder}/backend"
+			},
+			"group": "build",
+			"presentation": { "panel": "dedicated", "reveal": "always" }
+		},
+		{
+			"label": "frontend: dev",
+			"type": "shell",
+			"command": "npm run dev",
+			"options": {
+				"cwd": "${workspaceFolder}/frontend"
+			},
+			"group": "build",
+			"presentation": { "panel": "dedicated", "reveal": "always" }
+		},
+		{
+			"label": "frontend: build",
+			"type": "shell",
+			"command": "npm run build",
+			"options": {
+				"cwd": "${workspaceFolder}/frontend"
+			},
+			"group": "build",
+			"presentation": { "panel": "dedicated", "reveal": "always" }
 		}
 	]
 }

@@ -50,7 +50,7 @@ export default function ReportsPage() {
   });
 
   const { data: shipmentsTrend } = useQuery({
-    queryKey: ['shipments-trend'],
+    queryKey: ['shipments-trend', fromDate, toDate],
     queryFn: () =>
       api
         .get('/reports/shipments-by-day', { params: { from: fromDate, to: toDate } })
@@ -77,24 +77,11 @@ export default function ReportsPage() {
         title="Reports"
         description="Export data and view warehouse analytics."
         actions={
-          <div className="flex items-center gap-2">
-            <Calendar className="size-3.5 text-muted-foreground shrink-0" />
-            <input
-              type="date"
-              value={fromDate}
-              max={toDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              className="h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            />
-            <span className="text-xs text-muted-foreground">to</span>
-            <input
-              type="date"
-              value={toDate}
-              min={fromDate}
-              max={TODAY}
-              onChange={(e) => setToDate(e.target.value)}
-              className="h-8 rounded-lg border border-input bg-background px-2 text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-            />
+          <div className="flex items-center gap-3 flex-wrap">
+            <Calendar className="size-4 text-muted-foreground" />
+            <input type="date" value={fromDate} max={toDate} onChange={(e) => setFromDate(e.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
+            <span className="text-sm text-muted-foreground">to</span>
+            <input type="date" value={toDate} min={fromDate} max={TODAY} onChange={(e) => setToDate(e.target.value)} className="h-9 rounded-lg border border-input bg-background px-3 text-sm focus:outline-none focus:ring-1 focus:ring-ring" />
           </div>
         }
       />

@@ -59,9 +59,10 @@ function exportPicksCSV(tasks) {
 export default function PickingPage() {
   const [trolley, setTrolley] = useState('');
   const [rack, setRack] = useState('');
+  const [orderId, setOrderId] = useState('');
   const [search, setSearch] = useState('');
 
-  const { startSession, scanItem, expectedItems, scannedItems, isLoading } =
+  const { startSession, scanItem, resetSession, expectedItems, scannedItems, isLoading } =
     usePickingSession();
 
   const { data: pendingTasks, isLoading: tasksLoading } = useQuery({
@@ -93,7 +94,7 @@ export default function PickingPage() {
 
   const handleStart = (e) => {
     e.preventDefault();
-    if (trolley && rack) startSession(trolley, rack);
+    if (orderId) startSession(trolley || null, rack || null, orderId);
   };
 
   const handleScan = (e) => {
@@ -107,9 +108,17 @@ export default function PickingPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      
+      <PageHeader
+        title="Picking"
+        description="Manage pick tasks and run scan sessions on the warehouse floor."
+        actions={
+          <Button size="sm" variant="outline" onClick={() => exportPicksCSV(pendingTasks ?? [])} disabled={!pendingTasks?.length}>
+            <Download className="size-3.5 mr-1.5" /> Export CSV
+          </Button>
+        }
+      />
 
-      {/* KPI row â€” only when no active session */}
+      {/* KPI row — only when no active session */}
       {!sessionActive && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
           <StatCard
@@ -218,6 +227,7 @@ export default function PickingPage() {
                     <TableHead>SKU</TableHead>
                     <TableHead>Bin</TableHead>
                     <TableHead>Qty</TableHead>
+                    <TableHead>Order</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -232,6 +242,9 @@ export default function PickingPage() {
                         {task.binBarcode ?? task.bin}
                       </TableCell>
                       <TableCell>{task.requiredQty ?? task.quantity ?? 1}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {task.orderId ? `#${task.orderId}` : '—'}
+                      </TableCell>
                       <TableCell>
                         <StatusBadge status={task.status ?? 'PENDING'} />
                       </TableCell>
@@ -255,13 +268,24 @@ export default function PickingPage() {
           {!sessionActive ? (
             <form onSubmit={handleStart} className="flex flex-col gap-4">
               <p className="text-xs text-muted-foreground">
-                Scan your trolley and rack compartment barcodes to begin picking.
+                Enter the Sales Order ID to load pick tasks, then optionally scan trolley and rack barcodes.
               </p>
+              <div className="relative">
+                <ArrowRight className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <Input
+                  className="pl-9 font-mono text-sm"
+                  placeholder="Sales Order ID (required)"
+                  type="number"
+                  min={1}
+                  value={orderId}
+                  onChange={(e) => setOrderId(e.target.value)}
+                />
+              </div>
               <div className="relative">
                 <Package className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                 <Input
                   className="pl-9 font-mono text-sm"
-                  placeholder="Trolley barcode"
+                  placeholder="Trolley barcode (optional)"
                   value={trolley}
                   onChange={(e) => setTrolley(e.target.value)}
                 />
@@ -270,14 +294,14 @@ export default function PickingPage() {
                 <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
                 <Input
                   className="pl-9 font-mono text-sm"
-                  placeholder="Rack compartment barcode"
+                  placeholder="Rack compartment barcode (optional)"
                   value={rack}
                   onChange={(e) => setRack(e.target.value)}
                 />
               </div>
               <Button
                 type="submit"
-                disabled={isLoading || !trolley || !rack}
+                disabled={isLoading || !orderId}
                 className="w-full"
               >
                 <ArrowRight className="size-4 mr-2" />
@@ -286,6 +310,12 @@ export default function PickingPage() {
             </form>
           ) : (
             <div className="flex flex-col gap-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">Order #{orderId} — {scannedItems.length}/{expectedItems.length} picked</span>
+                <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { resetSession(); setOrderId(''); setTrolley(''); setRack(''); }}>
+                  <X className="size-3.5 mr-1" /> End Session
+                </Button>
+              </div>
               <Separator />
 
               <form onSubmit={handleScan} className="flex gap-2">

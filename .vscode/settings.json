@@ -1,3 +1,7 @@
 {
-    "java.compile.nullAnalysis.mode": "automatic"
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.project.referencedLibraries": ["backend/target/**/*.jar"],
+    "maven.executable.path": "D:\\Ak01\\maven\\apache-maven-3.9.6\\bin\\mvn.cmd",
+    "maven.terminal.useJavaHome": true,
+    "java.configuration.updateBuildConfiguration": "automatic"
 }

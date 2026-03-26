@@ -1,14 +1,20 @@
 'use client';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
+import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
 import api from '@/lib/api';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import {
   ScanLine,
   PackageCheck,
@@ -18,13 +24,27 @@ import {
   Check,
   Printer,
   RotateCcw,
+  List,
+  AlertCircle,
 } from 'lucide-react';
+import { format } from 'date-fns';
 
 export default function PackingPage() {
   const [trolleyBarcode, setTrolleyBarcode] = useState('');
   const [compartmentBarcode, setCompartmentBarcode] = useState('');
   const [manifest, setManifest] = useState(null);
   const [scanProgress, setScanProgress] = useState({});
+
+  // Fetch orders ready to pack (PICKED status)
+  const { data: packQueue, isLoading: queueLoading } = useQuery({
+    queryKey: ['pack-queue'],
+    queryFn: () => api.get('/orders').then((r) =>
+      (r.data ?? []).filter((o) => (o.status ?? o.state ?? '').toUpperCase() === 'PICKED')
+    ),
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    retry: false,
+  });
 
   const startMutation = useMutation({
     mutationFn: ({ trolley, compartment }) =>
@@ -89,9 +109,73 @@ export default function PackingPage() {
   const globalProgress = totalExpected > 0 ? Math.round((totalScanned / totalExpected) * 100) : 0;
   const isComplete = totalExpected > 0 && totalScanned >= totalExpected;
 
+  const printPackingSlip = () => {
+    if (!manifest) return;
+    const win = window.open('', '_blank', 'width=600,height=800');
+    win.document.write(`
+      <html><head><title>Packing Slip - Order #${manifest.orderId}</title>
+      <style>body{font-family:sans-serif;padding:24px;color:#111}h2{margin:0 0 4px}p{margin:2px 0;color:#555;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:13px}th{background:#f5f5f5}@media print{.no-print{display:none}}</style>
+      </head><body>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><h2>Packing Slip</h2><p>Order #${manifest.orderId}</p>${manifest.customerName ? `<p>Customer: ${manifest.customerName}</p>` : ''}</div>
+        <div style="text-align:right"><p style="font-size:12px">Date: ${new Date().toLocaleDateString()}</p></div>
+      </div>
+      <table><thead><tr><th>#</th><th>SKU</th><th>Expected Qty</th><th>Packed Qty</th></tr></thead><tbody>
+      ${manifest.lines.map((l, i) => `<tr><td>${i + 1}</td><td>${l.skuCode}</td><td>${l.expectedQty}</td><td>${scanProgress[l.skuCode] || 0}</td></tr>`).join('')}
+      </tbody></table>
+      <p style="margin-top:20px;font-size:12px;color:#888">All items verified and packed by warehouse team.</p>
+      <button class="no-print" onclick="window.print()" style="margin-top:12px;padding:8px 16px;cursor:pointer">Print</button>
+      </body></html>
+    `);
+    win.document.close();
+    win.focus();
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      
+      <PageHeader title="Packing" description="Load manifests and verify items before dispatch." />
+      {/* Packing Queue */}
+      <div className="glass-card rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <List className="size-4" /> Orders Ready to Pack
+          </h2>
+          <Badge variant="outline">{packQueue?.length ?? 0} orders</Badge>
+        </div>
+        {queueLoading ? (
+          <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : (packQueue?.length ?? 0) === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+            <CheckCircle2 className="size-8 opacity-30" />
+            <p className="text-sm">No orders waiting to be packed</p>
+          </div>
+        ) : (
+          <div className="overflow-auto max-h-48 rounded-xl border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Order #</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {packQueue.map((order) => (
+                  <TableRow key={order.id} className="table-row-hover">
+                    <TableCell className="font-bold text-primary">#{order.id}</TableCell>
+                    <TableCell className="font-medium">{order.customerName}</TableCell>
+                    <TableCell><StatusBadge status={order.status ?? order.state} /></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yyyy') : '—'}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
         <div className="glass-card rounded-2xl p-5 flex flex-col gap-5">
@@ -186,9 +270,14 @@ export default function PackingPage() {
                     <p className="font-semibold text-emerald-600 dark:text-emerald-400">All Items Packed!</p>
                     <p className="text-xs text-muted-foreground mt-1">Order #{manifest.orderId} is ready to ship</p>
                   </div>
-                  <Button variant="outline" size="sm" onClick={() => window.print()}>
-                    <Printer className="size-3.5 mr-1.5" /> Print Manifest
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={printPackingSlip}>
+                      <Printer className="size-3.5 mr-1.5" /> Print Packing Slip
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleReset}>
+                      <RotateCcw className="size-3.5 mr-1.5" /> New Order
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-4 thin-scrollbar overflow-y-auto max-h-96">

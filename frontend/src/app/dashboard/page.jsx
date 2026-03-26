@@ -27,8 +27,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Button } from '@/components/ui/button';
 import PageHeader from '@/components/PageHeader';
+import { Button } from '@/components/ui/button';
 import StatCard from '@/components/StatCard';
 import api from '@/lib/api';
 import {
@@ -39,7 +39,12 @@ import {
   ScanLine,
   Ship,
   ShoppingCart,
+  AlertTriangle,
+  Plus,
+  Printer,
+  TrendingUp,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const STATE_COLORS = {
   RECEIVED: 'hsl(var(--wms-dock))',
@@ -82,6 +87,7 @@ function ChartTooltip({ active, label, payload }) {
 
 const DashboardPage = () => {
   const queryClient = useQueryClient();
+  const router = useRouter();
 
   const { data: kpis, isLoading: kpisLoading, isError: kpisError, dataUpdatedAt } = useQuery({
     queryKey: ['dashboardKpis'],
@@ -102,7 +108,11 @@ const DashboardPage = () => {
     count,
   }));
 
-  const shipments = charts?.dailyShipments ?? charts ?? [];
+  // Normalize date labels to short form (e.g. "Mar 20")
+  const shipments = (charts?.dailyShipments ?? charts ?? []).map((d) => ({
+    ...d,
+    date: new Date(d.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+  }));
 
   const secondaryStats = [
     { label: 'Inbound Today', value: kpis?.inboundToday ?? 0, icon: Package },
@@ -138,43 +148,60 @@ const DashboardPage = () => {
 
   return (
     <div className="space-y-6">
-
       <PageHeader
         title="Dashboard"
-        description="Real-time overview of warehouse operations. Data refreshes automatically every 30 seconds."
-        breadcrumbs={[{ label: 'Dashboard' }]}
-        badge={
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
-            <span className="size-1.5 animate-pulse rounded-full bg-emerald-500" />
-            Live
-          </span>
-        }
+        description="Real-time warehouse overview. Auto-refreshes every 30 seconds."
         actions={
           <div className="flex items-center gap-2">
             {lastUpdated && (
-              <span className="hidden text-xs text-muted-foreground sm:block">
-                Updated {lastUpdated}
-              </span>
+              <span className="hidden text-xs text-muted-foreground sm:block">Updated {lastUpdated}</span>
             )}
-            <Button
-              size="sm"
-              variant="outline"
-              className="gap-1.5"
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['dashboardKpis'] });
-                queryClient.invalidateQueries({ queryKey: ['dashboardCharts'] });
-              }}
-            >
-              <RefreshCw className="size-3.5" />
-              Refresh
+            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => {
+              queryClient.invalidateQueries({ queryKey: ['dashboardKpis'] });
+              queryClient.invalidateQueries({ queryKey: ['dashboardCharts'] });
+            }}>
+              <RefreshCw className="size-3.5" /> Refresh
             </Button>
           </div>
         }
       />
 
+      {/* Alerts strip */}
+      {kpis && (kpis.pendingPicks > 0 || kpis.openOrders > 0) && (
+        <div className="flex flex-wrap gap-2">
+          {kpis.pendingPicks > 0 && (
+            <button onClick={() => router.push('/picking')} className="flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400 hover:bg-amber-500/15 transition-colors">
+              <AlertTriangle className="size-3.5 shrink-0" />
+              {kpis.pendingPicks} pending pick task{kpis.pendingPicks !== 1 ? 's' : ''} — click to view
+            </button>
+          )}
+          {kpis.openOrders > 0 && (
+            <button onClick={() => router.push('/orders')} className="flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs font-medium text-blue-700 dark:text-blue-400 hover:bg-blue-500/15 transition-colors">
+              <ShoppingCart className="size-3.5 shrink-0" />
+              {kpis.openOrders} open order{kpis.openOrders !== 1 ? 's' : ''} awaiting fulfilment
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Quick Actions */}
+      <div className="flex flex-wrap gap-2">
+        {[
+          { label: 'Receive PO', icon: Package, href: '/inbound' },
+          { label: 'New Order', icon: ShoppingCart, href: '/orders' },
+          { label: 'Start Picking', icon: ScanLine, href: '/picking' },
+          { label: 'Print Labels', icon: Printer, href: '/labels' },
+          { label: 'View Reports', icon: TrendingUp, href: '/reports' },
+        ].map(({ label, icon: Icon, href }) => (
+          <Button key={label} size="sm" variant="outline" className="h-8 gap-1.5 text-xs" onClick={() => router.push(href)}>
+            <Icon className="size-3.5" />{label}
+          </Button>
+        ))}
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard title="Total SKUs" value={kpis?.totalSkus} icon={Boxes} description="Tracked catalog items" />
-        <StatCard title="Bin Utilization" value={kpis?.binUtilizationPct?.toFixed?.(1) ?? kpis?.binsUtilization?.toFixed?.(1)} valueSuffix="%" icon={BarChart2} description="Average occupied bin volume" />
+        <StatCard title="Bin Utilization" value={kpis != null ? Number(kpis.binUtilizationPct ?? 0).toFixed(1) : undefined} valueSuffix="%" icon={BarChart2} description={`${kpis?.totalBins ?? 0} bins tracked`} />
         <StatCard title="Open Orders" value={kpis?.openOrders} icon={ShoppingCart} description="Orders waiting for fulfillment" />
         <StatCard title="Pending Picks" value={kpis?.pendingPicks} icon={ScanLine} description="Tasks still on the floor" />
         <StatCard title="Shipped Today" value={kpis?.shippedToday ?? kpis?.itemsShippedToday} icon={Ship} description="Units dispatched today" />
@@ -214,17 +241,24 @@ const DashboardPage = () => {
             <CardDescription>Current inventory mix across the warehouse.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie data={inventoryByState} dataKey="count" nameKey="name" innerRadius={65} outerRadius={100} paddingAngle={3}>
-                  {inventoryByState.map((entry) => (
-                    <Cell key={entry.name} fill={STATE_COLORS[entry.name] || 'hsl(var(--primary))'} />
-                  ))}
-                </Pie>
-                <Tooltip content={<ChartTooltip />} />
-                <Legend verticalAlign="bottom" iconType="circle" />
-              </PieChart>
-            </ResponsiveContainer>
+            {inventoryByState.length === 0 ? (
+              <div className="flex h-[300px] flex-col items-center justify-center gap-2 text-muted-foreground">
+                <Boxes className="size-10 opacity-30" />
+                <p className="text-sm">No inventory yet</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie data={inventoryByState} dataKey="count" nameKey="name" innerRadius={65} outerRadius={100} paddingAngle={3}>
+                    {inventoryByState.map((entry) => (
+                      <Cell key={entry.name} fill={STATE_COLORS[entry.name] || 'hsl(var(--primary))'} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<ChartTooltip />} />
+                  <Legend verticalAlign="bottom" iconType="circle" />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -254,20 +288,27 @@ const DashboardPage = () => {
           <CardDescription>Bar view for quick state comparison.</CardDescription>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={inventoryByState} margin={{ left: -10, right: 6, top: 8, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
-              <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<ChartTooltip />} />
-              <Legend />
-              <Bar dataKey="count" radius={[10, 10, 0, 0]}>
-                {inventoryByState.map((entry) => (
-                  <Cell key={entry.name} fill={STATE_COLORS[entry.name] || 'hsl(var(--primary))'} />
-                ))}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
+          {inventoryByState.length === 0 ? (
+            <div className="flex h-[280px] flex-col items-center justify-center gap-2 text-muted-foreground">
+              <BarChart2 className="size-10 opacity-30" />
+              <p className="text-sm">No inventory data — start receiving goods to see distribution</p>
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={inventoryByState} margin={{ left: -10, right: 6, top: 8, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" vertical={false} />
+                <XAxis dataKey="name" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<ChartTooltip />} />
+                <Legend />
+                <Bar dataKey="count" radius={[10, 10, 0, 0]}>
+                  {inventoryByState.map((entry) => (
+                    <Cell key={entry.name} fill={STATE_COLORS[entry.name] || 'hsl(var(--primary))'} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </CardContent>
       </Card>
     </div>

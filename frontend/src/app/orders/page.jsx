@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { Download, Eye, Loader2, Plus, Search, ShoppingCart, Trash2, X } from 'lucide-react';
+import { Download, Eye, Loader2, Plus, Search, ShoppingCart, Trash2, X, XCircle, MapPin } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import api from '@/lib/api';
@@ -21,6 +21,9 @@ import {
 import {
   Drawer, DrawerContent, DrawerDescription, DrawerHeader, DrawerTitle, DrawerTrigger,
 } from '@/components/ui/drawer';
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -31,7 +34,7 @@ import { Badge } from '@/components/ui/badge';
 const orderSchema = z.object({
   customerName: z.string().min(1, 'Customer name is required'),
   lines: z.array(z.object({
-    skuId: z.string().min(1, 'SKU is required'),
+    skuCode: z.string().min(1, 'SKU code is required'),
     quantity: z.coerce.number().int().min(1, 'Minimum 1'),
   })),
 });
@@ -103,6 +106,7 @@ function PickTaskList({ orderId }) {
 export default function OrdersPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [cancelDialogOrder, setCancelDialogOrder] = useState(null);
   const [activeTab, setActiveTab] = useState('ALL');
   const [search, setSearch] = useState('');
 
@@ -115,7 +119,7 @@ export default function OrdersPage() {
 
   const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(orderSchema),
-    defaultValues: { customerName: '', lines: [{ skuId: '', quantity: 1 }] },
+    defaultValues: { customerName: '', lines: [{ skuCode: '', quantity: 1 }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
@@ -130,7 +134,15 @@ export default function OrdersPage() {
     },
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to create order'),
   });
-
+  const cancelOrder = useMutation({
+    mutationFn: (id) => api.patch(`/orders/${id}/cancel`),
+    onSuccess: () => {
+      toast.success('Order cancelled');
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+      setCancelDialogOrder(null);
+    },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to cancel order'),
+  });
   const filteredOrders = useMemo(() => {
     let list = orders ?? [];
     if (activeTab !== 'ALL') list = list.filter((o) => (o.status ?? o.state ?? '').toUpperCase() === activeTab);
@@ -155,10 +167,92 @@ export default function OrdersPage() {
 
   return (
     <div className="space-y-6">
-      
+      <PageHeader
+        title="Sales Orders"
+        description="Create and manage customer orders through the fulfilment cycle."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => exportOrdersToExcel(orders ?? [])}>
+              <Download className="size-3.5 mr-1.5" /> Export
+            </Button>
+            <Button size="sm" onClick={() => setOpen(true)}>
+              <Plus className="size-3.5 mr-1.5" /> Create Order
+            </Button>
+          </div>
+        }
+      />
 
-      <div className="glass-card overflow-hidden rounded-[2rem]">
-        {/* Tabs + search bar */}
+      {/* Create Order Sheet */}
+      <Sheet open={open} onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+                <SheetHeader>
+                  <SheetTitle>New Sales Order</SheetTitle>
+                  <SheetDescription>Add customer details and order lines. Pick tasks will be generated automatically.</SheetDescription>
+                </SheetHeader>
+                <form onSubmit={handleSubmit((d) => createOrder.mutate(d))} className="mt-6 space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="customerName">Customer Name</Label>
+                    <Input id="customerName" placeholder="e.g. Acme Corp" {...register('customerName')} />
+                    {errors.customerName && <p className="text-xs text-destructive">{errors.customerName.message}</p>}
+                  </div>
+                  <Separator />
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <Label>Order Lines</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={() => append({ skuCode: '', quantity: 1 })}>
+                        <Plus className="size-3.5 mr-1" /> Add Line
+                      </Button>
+                    </div>
+                    {fields.map((field, i) => (
+                      <div key={field.id} className="rounded-xl border border-border/60 p-3 space-y-2 relative">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">SKU Code</Label>
+                            <Input placeholder="e.g. SKU-001" className="h-8 text-sm" {...register(`lines.${i}.skuCode`)} />
+                            {errors.lines?.[i]?.skuCode && <p className="text-[10px] text-destructive">{errors.lines[i].skuCode.message}</p>}
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Quantity</Label>
+                            <Input type="number" min={1} className="h-8 text-sm" {...register(`lines.${i}.quantity`)} />
+                            {errors.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errors.lines[i].quantity.message}</p>}
+                          </div>
+                        </div>
+                        {fields.length > 1 && (
+                          <button type="button" onClick={() => remove(i)} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive">
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <SheetFooter className="mt-6">
+                    <Button type="button" variant="outline" onClick={() => { setOpen(false); reset(); }}>Cancel</Button>
+                    <Button type="submit" disabled={createOrder.isPending}>
+                      {createOrder.isPending && <Loader2 className="size-3.5 mr-2 animate-spin" />}
+                      Create Order
+                    </Button>
+                  </SheetFooter>
+                </form>
+              </SheetContent>
+            </Sheet>
+
+      {/* Cancel confirmation dialog */}
+      <Dialog open={!!cancelDialogOrder} onOpenChange={(v) => !v && setCancelDialogOrder(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel Order #{cancelDialogOrder?.id}</DialogTitle>
+            <DialogDescription>Are you sure you want to cancel this order for <strong>{cancelDialogOrder?.customerName}</strong>? This action cannot be undone.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOrder(null)}>Keep Order</Button>
+            <Button variant="destructive" disabled={cancelOrder.isPending} onClick={() => cancelOrder.mutate(cancelDialogOrder.id)}>
+              {cancelOrder.isPending && <Loader2 className="size-3.5 mr-2 animate-spin" />}
+              Yes, Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+        <div className="glass-card overflow-hidden rounded-[2rem]">
         <div className="flex flex-col gap-3 border-b border-border/60 px-4 pt-4 pb-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Status tabs */}
@@ -231,20 +325,27 @@ export default function OrdersPage() {
                     {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yyyy') : 'â€”'}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Drawer>
-                      <DrawerTrigger asChild>
-                        <Button variant="outline" size="sm" className="h-7 text-xs">
-                          <Eye className="size-3.5" /> Pick Tasks
+                    <div className="flex items-center justify-end gap-1">
+                      <Drawer>
+                        <DrawerTrigger asChild>
+                          <Button variant="outline" size="sm" className="h-7 text-xs">
+                            <Eye className="size-3.5 mr-1" /> Pick Tasks
+                          </Button>
+                        </DrawerTrigger>
+                        <DrawerContent>
+                          <DrawerHeader>
+                            <DrawerTitle>Order #{order.id} — {order.customerName}</DrawerTitle>
+                            <DrawerDescription>Pick tasks generated for this order.</DrawerDescription>
+                          </DrawerHeader>
+                          <PickTaskList orderId={order.id} />
+                        </DrawerContent>
+                      </Drawer>
+                      {!['SHIPPED', 'CANCELLED'].includes((order.status ?? order.state ?? '').toUpperCase()) && (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs text-destructive hover:text-destructive hover:bg-destructive/10" onClick={() => setCancelDialogOrder(order)}>
+                          <XCircle className="size-3.5" />
                         </Button>
-                      </DrawerTrigger>
-                      <DrawerContent>
-                        <DrawerHeader>
-                          <DrawerTitle>Order #{order.id} â€” {order.customerName}</DrawerTitle>
-                          <DrawerDescription>Pick tasks generated for this order.</DrawerDescription>
-                        </DrawerHeader>
-                        <PickTaskList orderId={order.id} />
-                      </DrawerContent>
-                    </Drawer>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

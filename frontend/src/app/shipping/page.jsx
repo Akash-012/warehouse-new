@@ -2,18 +2,28 @@
 export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import api from '@/lib/api';
-import { Ship, Search, Package, Check, Truck, Calendar, Hash } from 'lucide-react';
+import { Ship, Search, Package, Check, Truck, Calendar, Hash, List } from 'lucide-react';
+
+const COURIERS = ['Blue Dart', 'Delhivery', 'DTDC', 'FedEx', 'Ekart', 'Shadowfax', 'Xpressbees', 'Other'];
 
 const shipSchema = z.object({
   orderId: z.coerce.number().int().positive('Order ID is required'),
@@ -51,15 +61,26 @@ export default function ShippingPage() {
   const [lookupId, setLookupId] = useState('');
   const [lookupResult, setLookupResult] = useState(null);
   const [confirmed, setConfirmed] = useState(null);
+  const [selectedCourier, setSelectedCourier] = useState('');
 
-  const { register, handleSubmit, reset, formState: { errors } } = useForm({ resolver: zodResolver(shipSchema) });
+  const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm({ resolver: zodResolver(shipSchema) });
+
+  // Packed orders ready to dispatch
+  const { data: packedOrders, isLoading: packedLoading } = useQuery({
+    queryKey: ['packed-orders'],
+    queryFn: () => api.get('/orders').then((r) =>
+      (r.data ?? []).filter((o) => (o.status ?? o.state ?? '').toUpperCase() === 'PACKED')
+    ),
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    retry: false,
+  });
 
   const confirmMutation = useMutation({
     mutationFn: (data) => api.post('/shipping/confirm', data).then((r) => r.data),
     onSuccess: (data) => {
       toast.success(`Shipment confirmed Ã¢â‚¬â€ AWB ${data.awbNumber ?? ''}`);
-      setConfirmed(data);
-      reset();
+      setConfirmed(data);      setSelectedCourier('');      reset();
     },
     onError: () => toast.error('Failed to confirm shipment'),
   });
@@ -81,6 +102,56 @@ export default function ShippingPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Shipping" description="Confirm dispatch and look up shipment records." />
+      {/* Packed Orders Queue */}
+      <div className="glass-card rounded-2xl p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <List className="size-4 text-primary" />
+          <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Orders Ready to Dispatch</h2>
+          <span className="ml-auto text-xs text-muted-foreground">{packedOrders?.length ?? 0} orders</span>
+        </div>
+        {packedLoading ? (
+          <div className="space-y-2">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-10 w-full" />)}</div>
+        ) : (packedOrders?.length ?? 0) === 0 ? (
+          <div className="flex flex-col items-center justify-center gap-2 py-8 text-muted-foreground">
+            <Check className="size-8 opacity-30" />
+            <p className="text-sm">No packed orders waiting for dispatch</p>
+          </div>
+        ) : (
+          <div className="overflow-auto max-h-48 rounded-xl border border-border">
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Order #</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {packedOrders.map((order) => (
+                  <TableRow key={order.id} className="table-row-hover">
+                    <TableCell className="font-bold text-primary">#{order.id}</TableCell>
+                    <TableCell className="font-medium">{order.customerName}</TableCell>
+                    <TableCell><StatusBadge status={order.status ?? order.state} /></TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yyyy') : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                        setValue('orderId', order.id);
+                        setConfirmed(null);
+                      }}>
+                        <Ship className="size-3 mr-1" /> Dispatch
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Confirm shipment */}
@@ -114,7 +185,14 @@ export default function ShippingPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="courierName">Courier</Label>
-                <Input id="courierName" {...register('courierName')} placeholder="e.g. DHL Express" />
+                <Select value={selectedCourier} onValueChange={(v) => { setSelectedCourier(v); setValue('courierName', v); }}>
+                  <SelectTrigger id="courierName">
+                    <SelectValue placeholder="Select courier…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COURIERS.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 {errors.courierName && <p className="text-xs text-destructive">{errors.courierName.message}</p>}
               </div>
               <Button type="submit" disabled={confirmMutation.isPending} className="w-full">

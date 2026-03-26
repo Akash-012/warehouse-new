@@ -22,6 +22,7 @@ const loginSchema = z.object({
 export default function LoginPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
+  const [showDemoPasswords, setShowDemoPasswords] = useState(false);
 
   // Clear any stale/expired token when landing on login
   useEffect(() => {
@@ -31,6 +32,7 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm({
     resolver: zodResolver(loginSchema),
@@ -44,6 +46,9 @@ export default function LoginPage() {
     try {
       const { data } = await api.post('/auth/login', values);
       localStorage.setItem('wms_token', data.token);
+      localStorage.setItem('wms_username', data.username);
+      localStorage.setItem('wms_role', data.role);
+      localStorage.setItem('wms_permissions', JSON.stringify(data.permissions ?? []));
       toast.success('Signed in successfully');
       router.push('/dashboard');
     } catch (error) {
@@ -128,8 +133,38 @@ export default function LoginPage() {
                 Continue to dashboard
               </Button>
 
-              <div className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
-                Demo login: <span className="font-medium text-foreground">admin / admin123</span>
+              <div className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="font-semibold text-foreground text-xs uppercase tracking-wide">Demo Credentials</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowDemoPasswords((v) => !v)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showDemoPasswords ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                  </button>
+                </div>
+                {[
+                  { role: 'Super Admin', user: 'superadmin', pass: 'superadmin123' },
+                  { role: 'Admin',       user: 'admin',      pass: 'admin123'      },
+                  { role: 'Manager',     user: 'manager',    pass: 'manager123'    },
+                  { role: 'Worker',      user: 'worker',     pass: 'worker123'     },
+                ].map(({ role, user, pass }) => (
+                  <button
+                    key={user}
+                    type="button"
+                    onClick={() => {
+                      setValue('username', user);
+                      setValue('password', pass);
+                    }}
+                    className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 hover:bg-muted transition-colors text-left"
+                  >
+                    <span className="text-xs text-muted-foreground w-24">{role}</span>
+                    <span className="font-mono text-xs text-foreground">
+                      {user} / {showDemoPasswords ? pass : '•'.repeat(pass.length)}
+                    </span>
+                  </button>
+                ))}
               </div>
             </form>
           </CardContent>

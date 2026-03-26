@@ -17,6 +17,7 @@ import {
   Search,
   Warehouse,
   X,
+  ListChecks,
 } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatCard from '@/components/StatCard';
@@ -115,9 +116,10 @@ export default function PutawayPage() {
   const stats = useMemo(() => {
     const all = tasks ?? [];
     return {
-      total: all.length,
+      total:  all.length,
       high:   all.filter((t) => t.priority === 1).length,
       medium: all.filter((t) => t.priority === 2).length,
+      low:    all.filter((t) => t.priority === 3).length,
     };
   }, [tasks]);
 
@@ -138,13 +140,21 @@ export default function PutawayPage() {
 
   return (
     <div className="space-y-6">
-
-
+      <PageHeader
+        title="Putaway"
+        description="Assign received items to bin locations across the warehouse."
+        actions={
+          <Button size="sm" variant="outline" onClick={() => exportTasksCSV(tasks ?? [])} disabled={!tasks?.length}>
+            <Download className="size-3.5 mr-1.5" /> Export CSV
+          </Button>
+        }
+      />
       {/* KPI row */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <StatCard title="Pending Tasks"   value={stats.total}  icon={Warehouse}     kpiVariant="blue"  accentClass="text-blue-500"   iconBg="bg-blue-500/10" />
         <StatCard title="High Priority"   value={stats.high}   icon={AlertCircle}   kpiVariant="rose"  accentClass="text-rose-500"   iconBg="bg-rose-500/10" />
         <StatCard title="Medium Priority" value={stats.medium} icon={PackageSearch} kpiVariant="amber" accentClass="text-amber-500"  iconBg="bg-amber-500/10" />
+        <StatCard title="Low Priority"    value={stats.low}    icon={ListChecks}    kpiVariant="blue"  accentClass="text-slate-500"  iconBg="bg-slate-500/10" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
@@ -206,7 +216,8 @@ export default function PutawayPage() {
                     <TableHead className="pl-6">Priority</TableHead>
                     <TableHead>Item Barcode</TableHead>
                     <TableHead>Suggested Bin</TableHead>
-                    <TableHead className="pr-6">SKU</TableHead>
+                    <TableHead>SKU</TableHead>
+                    <TableHead className="pr-6">GRN / PO Ref</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -230,7 +241,10 @@ export default function PutawayPage() {
                         <TableCell className="font-mono text-sm font-medium text-primary">
                           {task.suggestedBin ?? task.suggestedBinBarcode}
                         </TableCell>
-                        <TableCell className="pr-6">{task.skuCode ?? 'Ã¢â‚¬â€'}</TableCell>
+                        <TableCell>{task.skuCode ?? '—'}</TableCell>
+                        <TableCell className="pr-6 text-xs text-muted-foreground font-mono">
+                          {task.grnNo ?? task.poNumber ?? '—'}
+                        </TableCell>
                       </TableRow>
                     ))
                   ) : (

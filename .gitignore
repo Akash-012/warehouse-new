@@ -1,0 +1,25 @@
+# Environment variable files — never commit these
+.env
+.env.local
+.env.*.local
+backend/.env
+backend/.env.local
+
+# Java build output
+target/
+*.class
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

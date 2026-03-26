@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { Download, Loader2, Package, Plus, Search, Trash2, X } from 'lucide-react';
+import { Download, Loader2, Package, Plus, Search, Trash2, X, ClipboardList } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import StatCard from '@/components/StatCard';
@@ -29,9 +29,9 @@ import api from '@/lib/api';
 import { toast } from 'sonner';
 
 const receiveSchema = z.object({
-  poId: z.string().min(1, 'PO ID is required'),
+  poId: z.coerce.number().int().positive('PO ID is required'),
   lines: z.array(z.object({
-    skuId: z.string().min(1, 'SKU is required'),
+    skuCode: z.string().min(1, 'SKU code is required'),
     quantity: z.coerce.number().int().min(1, 'Minimum 1'),
     batchNo: z.string().min(1, 'Batch number is required'),
   })).min(1, 'At least one line is required'),
@@ -56,6 +56,7 @@ function exportPOs(pos) {
 export default function InboundPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [grnResult, setGrnResult] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
 
@@ -69,7 +70,7 @@ export default function InboundPage() {
 
   const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
     resolver: zodResolver(receiveSchema),
-    defaultValues: { poId: '', lines: [{ skuId: '', quantity: 1, batchNo: '' }] },
+    defaultValues: { poId: '', lines: [{ skuCode: '', quantity: 1, batchNo: '' }] },
   });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
@@ -77,9 +78,9 @@ export default function InboundPage() {
   const receiveMutation = useMutation({
     mutationFn: (payload) => api.post('/inbound/receive', payload),
     onSuccess: ({ data }) => {
+      setGrnResult(data.grnNo);
       toast.success(`GRN ${data.grnNo} created successfully`);
       queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
-      setOpen(false);
       reset();
     },
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to receive PO'),
@@ -107,8 +108,93 @@ export default function InboundPage() {
 
   return (
     <div className="space-y-6">
+      <PageHeader
+        title="Inbound"
+        description="Manage purchase orders and receive goods into the warehouse."
+        actions={
+          <div className="flex items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => exportPOs(purchaseOrders ?? [])}>
+              <Download className="size-3.5 mr-1.5" /> Export CSV
+            </Button>
+            <Button size="sm" onClick={() => setOpen(true)}>
+              <Plus className="size-3.5 mr-1.5" /> Receive PO
+            </Button>
+          </div>
+        }
+      />
 
-      {/* Stats row */}
+      {/* Receive PO Dialog */}
+      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setGrnResult(null); reset(); } }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Receive Purchase Order</DialogTitle>
+            <DialogDescription>Enter the PO ID and items being received. A GRN will be created.</DialogDescription>
+          </DialogHeader>
+                {grnResult ? (
+                  <div className="flex flex-col items-center gap-4 py-6 text-center">
+                    <div className="size-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
+                      <ClipboardList className="size-7 text-emerald-500" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-lg">GRN Created</p>
+                      <p className="text-muted-foreground text-sm mt-1">GRN Number: <span className="font-mono font-bold text-foreground">{grnResult}</span></p>
+                    </div>
+                    <Button onClick={() => { setGrnResult(null); reset(); }} variant="outline" className="w-full">Receive Another PO</Button>
+                    <Button onClick={() => setOpen(false)} className="w-full">Done</Button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSubmit((d) => receiveMutation.mutate(d))} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="poId">PO ID</Label>
+                      <Input id="poId" placeholder="e.g. 1001" {...register('poId')} />
+                      {errors.poId && <p className="text-xs text-destructive">{errors.poId.message}</p>}
+                    </div>
+                    <Separator />
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Lines</Label>
+                        <Button type="button" size="sm" variant="outline" onClick={() => append({ skuCode: '', quantity: 1, batchNo: '' })}>
+                          <Plus className="size-3.5 mr-1" /> Add Line
+                        </Button>
+                      </div>
+                      {fields.map((field, i) => (
+                        <div key={field.id} className="rounded-xl border border-border/60 p-3 space-y-2.5 relative">
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">SKU Code</Label>
+                              <Input placeholder="e.g. SKU-001" className="h-8 text-sm" {...register(`lines.${i}.skuCode`)} />
+                              {errors.lines?.[i]?.skuCode && <p className="text-[10px] text-destructive">{errors.lines[i].skuCode.message}</p>}
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">Quantity</Label>
+                              <Input type="number" min={1} className="h-8 text-sm" {...register(`lines.${i}.quantity`)} />
+                              {errors.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errors.lines[i].quantity.message}</p>}
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">Batch Number</Label>
+                            <Input placeholder="BATCH-2026-001" className="h-8 text-sm font-mono" {...register(`lines.${i}.batchNo`)} />
+                            {errors.lines?.[i]?.batchNo && <p className="text-[10px] text-destructive">{errors.lines[i].batchNo.message}</p>}
+                          </div>
+                          {fields.length > 1 && (
+                            <button type="button" onClick={() => remove(i)} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors">
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+                      <Button type="submit" disabled={receiveMutation.isPending}>
+                        {receiveMutation.isPending && <Loader2 className="size-3.5 mr-2 animate-spin" />}
+                        Receive Goods
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                )}
+        </DialogContent>
+      </Dialog>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard title="Total POs"     value={stats.total}    icon={Package} kpiVariant="blue"   accentClass="text-blue-500"   iconBg="bg-blue-500/10" />
         <StatCard title="Pending"       value={stats.pending}  icon={Package} kpiVariant="amber"  accentClass="text-amber-500"  iconBg="bg-amber-500/10" />
@@ -138,7 +224,7 @@ export default function InboundPage() {
           )}
         </div>
 
-        <Table>
+          <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent bg-muted/20">
               <TableHead>PO Number</TableHead>
@@ -146,13 +232,14 @@ export default function InboundPage() {
               <TableHead>Status</TableHead>
               <TableHead>Lines</TableHead>
               <TableHead>Date</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               [...Array(6)].map((_, i) => (
                 <TableRow key={i}>
-                  {[...Array(5)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                  {[...Array(6)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
                 </TableRow>
               ))
             ) : filteredPOs.length ? (
@@ -165,11 +252,22 @@ export default function InboundPage() {
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {po.createdAt ? format(new Date(po.createdAt), 'dd MMM yyyy') : '—'}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {po.status !== 'RECEIVED' && (
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                        reset({ poId: po.id ?? po.poNumber ?? '', lines: [{ skuCode: '', quantity: 1, batchNo: '' }] });
+                        setGrnResult(null);
+                        setOpen(true);
+                      }}>
+                        <Package className="size-3 mr-1" /> Receive
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={5} className="h-40 text-center text-muted-foreground">
+                <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
                   <Package className="mx-auto mb-3 size-8 opacity-30" />
                   {search || statusFilter !== 'ALL' ? 'No POs match the current filter.' : 'No purchase orders available yet.'}
                 </TableCell>

@@ -232,6 +232,12 @@
     background: var(--card);
     border: 1px solid var(--border, oklch(0.914 0.008 264));
     box-shadow: var(--shadow-sm);
+    border-radius: 0.75rem;
+  }
+  .glass-card:hover {
+    border-color: hsl(var(--wms-primary) / 0.35);
+    box-shadow: var(--shadow-md);
+    transition: all 200ms ease;
   }
 
   .surface-grid {
@@ -241,13 +247,44 @@
     background-size: 28px 28px;
   }
 
-  /* ── Cards ─────────────────────────────────────────── */
+  /* ── Cards + Data containers (Zoho-style) ───────────────────────────── */
   .card-hover {
-    transition: box-shadow 150ms ease, transform 150ms ease;
+    transition: box-shadow 200ms ease, transform 150ms ease, border-color 150ms ease;
+    border: 1px solid var(--border);
   }
   .card-hover:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+    transform: translateY(-2px);
+    border-color: hsl(var(--wms-primary) / 0.4);
+    background: color-mix(in oklch, var(--card) 98%, hsl(var(--wms-primary) / 5%));
+  }
+
+  /* ── Table styling (enhanced Zoho-like) ─────────────────────────────── */
+  table {
+    @apply w-full border-collapse;
+  }
+  
+  thead {
+    @apply bg-muted/35 border-b border-border;
+  }
+  
+  th {
+    @apply px-4 py-3 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wider;
+    letter-spacing: 0.12em;
+    background: color-mix(in oklch, var(--background) 96%, hsl(var(--wms-primary) / 2%));
+  }
+  
+  td {
+    @apply px-4 py-3 text-sm;
+    border-bottom: 1px solid var(--border);
+  }
+  
+  tbody tr {
+    @apply transition-colors duration-150;
+  }
+  
+  tbody tr:hover {
+    @apply bg-accent/30;
   }
 
   /* ── Scrollbars ────────────────────────────────────── */
@@ -265,47 +302,73 @@
     border-radius: 2px;
   }
 
-  /* ── Tables ─────────────────────────────────────────── */
-  .table-row-hover { @apply transition-colors; }
-  .table-row-hover:hover { @apply bg-primary/4; }
+  /* ── Tables row hover ──────────────────────────────── */
+  .table-row-hover { 
+    @apply transition-colors duration-150;
+  }
+  .table-row-hover:hover { 
+    @apply bg-accent/40;
+  }
+
+  /* ── Form inputs professional style (Zoho) ────────────────── */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  input[type="date"],
+  input[type="search"],
+  textarea,
+  select {
+    @apply rounded-md border border-input bg-background px-3 py-2 text-sm transition-all duration-200;
+    @apply placeholder:text-muted-foreground/70;
+    @apply focus:outline-none focus:ring-2 focus:ring-ring/60 focus:ring-offset-0 focus:border-primary;
+    @apply disabled:cursor-not-allowed disabled:opacity-50 disabled:bg-muted/20;
+  }
+  
+  textarea {
+    resize: vertical;
+  }
 
   /* ── Accent borders ─────────────────────────────────── */
-  .accent-border-l { border-left: 3px solid hsl(var(--wms-primary)); }
+  .accent-border-l { border-left: 4px solid hsl(var(--wms-primary)); }
+  .accent-border-t { border-top: 4px solid hsl(var(--wms-primary)); }
 
   /* ── Trend badges ───────────────────────────────────── */
-  .trend-up   { @apply text-emerald-600 dark:text-emerald-400; }
-  .trend-down { @apply text-rose-600    dark:text-rose-400;    }
-  .trend-flat { @apply text-muted-foreground; }
+  .trend-up   { @apply text-emerald-600 dark:text-emerald-400 font-semibold; }
+  .trend-down { @apply text-rose-600    dark:text-rose-400    font-semibold; }
+  .trend-flat { @apply text-muted-foreground font-semibold; }
 
-  /* ── Status dot pulse ───────────────────────────────── */
+  /* ── Status dot pulse (Zoho-style) ───────────────────────────────── */
   .status-dot-pulse::before {
     content: '';
     display: inline-block;
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
     background: currentColor;
-    margin-right: 6px;
+    margin-right: 8px;
     vertical-align: middle;
-    animation: status-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    animation: status-pulse 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    box-shadow: 0 0 0 2px currentColor;
+    opacity: 0.8;
   }
 
   /* ── KPI card gradient backgrounds ─────────────────── */
-  .kpi-blue   { background: linear-gradient(135deg, hsl(220 80% 55% / 0.10), hsl(220 80% 55% / 0.04)); }
-  .kpi-purple { background: linear-gradient(135deg, hsl(270 70% 60% / 0.10), hsl(270 70% 60% / 0.04)); }
-  .kpi-green  { background: linear-gradient(135deg, hsl(142 70% 45% / 0.10), hsl(142 70% 45% / 0.04)); }
-  .kpi-amber  { background: linear-gradient(135deg, hsl(38  92% 52% / 0.10), hsl(38  92% 52% / 0.04)); }
-  .kpi-cyan   { background: linear-gradient(135deg, hsl(200 90% 50% / 0.10), hsl(200 90% 50% / 0.04)); }
-  .kpi-rose   { background: linear-gradient(135deg, hsl(350 80% 58% / 0.10), hsl(350 80% 58% / 0.04)); }
+  .kpi-blue   { background: linear-gradient(135deg, hsl(220 80% 55% / 0.08), hsl(220 80% 55% / 0.02)); border: 1px solid hsl(220 80% 55% / 0.15); }
+  .kpi-purple { background: linear-gradient(135deg, hsl(270 70% 60% / 0.08), hsl(270 70% 60% / 0.02)); border: 1px solid hsl(270 70% 60% / 0.15); }
+  .kpi-green  { background: linear-gradient(135deg, hsl(142 70% 45% / 0.08), hsl(142 70% 45% / 0.02)); border: 1px solid hsl(142 70% 45% / 0.15); }
+  .kpi-amber  { background: linear-gradient(135deg, hsl(38  92% 52% / 0.08), hsl(38  92% 52% / 0.02)); border: 1px solid hsl(38  92% 52% / 0.15); }
+  .kpi-cyan   { background: linear-gradient(135deg, hsl(200 90% 50% / 0.08), hsl(200 90% 50% / 0.02)); border: 1px solid hsl(200 90% 50% / 0.15); }
+  .kpi-rose   { background: linear-gradient(135deg, hsl(350 80% 58% / 0.08), hsl(350 80% 58% / 0.02)); border: 1px solid hsl(350 80% 58% / 0.15); }
 
-  /* ── Tab underline active ───────────────────────────── */
+  /* ── Tab underline active (Zoho style) ──────────────── */
   .tab-active { @apply relative font-semibold text-foreground; }
   .tab-active::after {
     content: '';
     position: absolute;
     bottom: -1px;
     left: 0; right: 0;
-    height: 2px;
+    height: 2.5px;
     border-radius: 99px;
     background: hsl(var(--wms-primary));
   }
@@ -313,8 +376,8 @@
   /* ── Label CAPS (section headers) ──────────────────── */
   .label-caps {
     font-size: 0.6875rem;
-    font-weight: 500;
-    letter-spacing: 0.08em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
     text-transform: uppercase;
     color: var(--muted-foreground);
   }
@@ -323,8 +386,9 @@
   .barcode-text {
     font-family: var(--font-mono);
     font-size: 0.75rem;
-    letter-spacing: 0.03em;
+    letter-spacing: 0.04em;
     color: hsl(var(--wms-primary));
+    font-weight: 600;
   }
 
   /* ── Shimmer skeleton ───────────────────────────────── */
