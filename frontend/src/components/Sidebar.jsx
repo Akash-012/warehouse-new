@@ -31,6 +31,7 @@ import {
   Bell,
   LogOut,
   Users,
+  ShieldCheck,
 } from 'lucide-react';
 
 const SIDEBAR_MIN       = 64;
@@ -49,10 +50,16 @@ const ALL_MENU_ITEMS = [
   { href: '/trolleys',    label: 'Trolleys',    icon: Truck,           group: 'Fulfillment', permission: P.TROLLEYS_VIEW   },
   { href: '/packing',     label: 'Packing',     icon: PackageCheck,    group: 'Fulfillment', permission: P.PACKING_VIEW    },
   { href: '/shipping',    label: 'Shipping',    icon: Ship,            group: 'Fulfillment', permission: P.SHIPPING_VIEW   },
-  { href: '/master/bins', label: 'Master Data', icon: Database,        group: 'Admin',       permission: P.MASTER_VIEW     },
+  { href: '/master/warehouses', label: 'Warehouse Master', icon: Database, group: 'Admin', permission: P.MASTER_VIEW },
+  { href: '/master/zones',      label: 'Zone Master',      icon: Database, group: 'Admin', permission: P.MASTER_VIEW },
+  { href: '/master/aisles',     label: 'Aisle Master',     icon: Database, group: 'Admin', permission: P.MASTER_VIEW },
+  { href: '/master/racks',      label: 'Rack Master',      icon: Database, group: 'Admin', permission: P.MASTER_VIEW },
+  { href: '/master/bins',       label: 'Bin Master',       icon: Database, group: 'Admin', permission: P.MASTER_VIEW },
   { href: '/reports',     label: 'Reports',     icon: BarChart3,       group: 'Admin',       permission: P.REPORTS_VIEW    },
   { href: '/labels',      label: 'Labels',      icon: Tag,             group: 'Admin',       permission: P.LABELS_VIEW     },
   { href: '/users',       label: 'Users',       icon: Users,           group: 'Admin',       permission: P.USERS_VIEW      },
+  { href: '/roles',       label: 'Roles',       icon: ShieldCheck,     group: 'Admin',       permission: P.USERS_MANAGE    },
+  { href: '/roles/access',label: 'Role Access', icon: ShieldCheck,     group: 'Admin',       permission: P.USERS_MANAGE    },
   { href: '/settings',    label: 'Settings',    icon: Settings,        group: 'Admin',       permission: null              },
 ];
 
@@ -116,12 +123,12 @@ const Sidebar = () => {
   const router                      = useRouter();
   const dragStartX                  = useRef(0);
   const dragStartWidth              = useRef(0);
-  const { can, username, role }     = usePermissions();
+  const { can, username, role, loaded } = usePermissions();
 
   const isCollapsed = width <= SIDEBAR_COLLAPSED + 10;
 
   // Filter menu items by permission
-  const menuItems = ALL_MENU_ITEMS.filter((item) =>
+  const menuItems = (loaded ? ALL_MENU_ITEMS : []).filter((item) =>
     item.permission === null || can(item.permission)
   );
 

@@ -10,12 +10,14 @@ import org.springframework.stereotype.Component;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
     private final WarehouseRepository warehouseRepository;
     private final ZoneRepository zoneRepository;
@@ -34,6 +36,7 @@ public class DataInitializer implements CommandLineRunner {
 
     public DataInitializer(
             UserRepository userRepository,
+            RoleRepository roleRepository,
             PasswordEncoder passwordEncoder,
             WarehouseRepository warehouseRepository,
             ZoneRepository zoneRepository,
@@ -50,6 +53,7 @@ public class DataInitializer implements CommandLineRunner {
             ShipmentRecordRepository shipmentRecordRepository,
             JdbcTemplate jdbc) {
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
         this.warehouseRepository = warehouseRepository;
         this.zoneRepository = zoneRepository;
@@ -79,17 +83,84 @@ public class DataInitializer implements CommandLineRunner {
 
     // ── Users ─────────────────────────────────────────────────────────────────
     private void seedUsers() {
-        // Fix legacy role values stored with ROLE_ prefix (e.g. ROLE_ADMIN -> ADMIN)
-        jdbc.update("UPDATE _user SET role = REPLACE(role, 'ROLE_', '') WHERE role LIKE 'ROLE_%'");
-
-        seedUser("superadmin", "superadmin123", Role.SUPER_ADMIN);
-        seedUser("admin",      "admin123",      Role.ADMIN);
-        seedUser("manager",    "manager123",    Role.MANAGER);
-        seedUser("worker",     "worker123",     Role.WORKER);
+        seedDefaultRoles();
+        repairInvalidUserRoleIds();
+        seedUser("superadmin", "superadmin123", "SUPER_ADMIN");
+        seedUser("admin",      "admin123",      "ADMIN");
+        seedUser("manager",    "manager123",    "MANAGER");
+        seedUser("worker",     "worker123",     "WORKER");
     }
 
-    private void seedUser(String username, String password, Role role) {
+    private void repairInvalidUserRoleIds() {
+        // Repair legacy or corrupted role_id values (e.g. 0) before loading users as entities.
+        jdbc.update("""
+            UPDATE _user u
+            JOIN wms_role r ON r.name = 'WORKER'
+            LEFT JOIN wms_role existing ON existing.id = u.role_id
+            SET u.role_id = r.id
+            WHERE existing.id IS NULL
+            """);
+
+        // Keep seeded demo users mapped to expected default roles.
+        jdbc.update("UPDATE _user u JOIN wms_role r ON r.name = 'SUPER_ADMIN' SET u.role_id = r.id WHERE u.username = 'superadmin'");
+        jdbc.update("UPDATE _user u JOIN wms_role r ON r.name = 'ADMIN' SET u.role_id = r.id WHERE u.username = 'admin'");
+        jdbc.update("UPDATE _user u JOIN wms_role r ON r.name = 'MANAGER' SET u.role_id = r.id WHERE u.username = 'manager'");
+        jdbc.update("UPDATE _user u JOIN wms_role r ON r.name = 'WORKER' SET u.role_id = r.id WHERE u.username = 'worker'");
+    }
+
+    private void seedDefaultRoles() {
+        upsertRole("SUPER_ADMIN", EnumSet.allOf(Permission.class));
+        upsertRole("ADMIN", EnumSet.of(
+                Permission.DASHBOARD_VIEW,
+                Permission.INBOUND_VIEW, Permission.INBOUND_RECEIVE,
+                Permission.INVENTORY_VIEW, Permission.INVENTORY_ADJUST,
+                Permission.PUTAWAY_VIEW, Permission.PUTAWAY_EXECUTE,
+                Permission.PICKING_VIEW, Permission.PICKING_EXECUTE,
+                Permission.PACKING_VIEW, Permission.PACKING_EXECUTE,
+                Permission.SHIPPING_VIEW, Permission.SHIPPING_CONFIRM,
+                Permission.ORDERS_VIEW, Permission.ORDERS_CREATE,
+                Permission.TROLLEYS_VIEW, Permission.TROLLEYS_CREATE, Permission.TROLLEYS_ASSIGN,
+                Permission.LABELS_VIEW, Permission.LABELS_PRINT,
+                Permission.REPORTS_VIEW, Permission.REPORTS_EXPORT,
+                Permission.MASTER_VIEW, Permission.MASTER_MANAGE,
+                Permission.USERS_VIEW
+        ));
+        upsertRole("MANAGER", EnumSet.of(
+                Permission.DASHBOARD_VIEW,
+                Permission.INBOUND_VIEW, Permission.INBOUND_RECEIVE,
+                Permission.INVENTORY_VIEW, Permission.INVENTORY_ADJUST,
+                Permission.PUTAWAY_VIEW, Permission.PUTAWAY_EXECUTE,
+                Permission.PICKING_VIEW, Permission.PICKING_EXECUTE,
+                Permission.PACKING_VIEW, Permission.PACKING_EXECUTE,
+                Permission.SHIPPING_VIEW, Permission.SHIPPING_CONFIRM,
+                Permission.ORDERS_VIEW, Permission.ORDERS_CREATE,
+                Permission.TROLLEYS_VIEW, Permission.TROLLEYS_CREATE, Permission.TROLLEYS_ASSIGN,
+                Permission.LABELS_VIEW, Permission.LABELS_PRINT,
+                Permission.REPORTS_VIEW, Permission.REPORTS_EXPORT,
+                Permission.MASTER_VIEW
+        ));
+        upsertRole("WORKER", EnumSet.of(
+                Permission.DASHBOARD_VIEW,
+                Permission.INBOUND_VIEW,
+                Permission.INVENTORY_VIEW,
+                Permission.PUTAWAY_VIEW, Permission.PUTAWAY_EXECUTE,
+                Permission.PICKING_VIEW, Permission.PICKING_EXECUTE,
+                Permission.PACKING_VIEW, Permission.PACKING_EXECUTE,
+                Permission.TROLLEYS_VIEW, Permission.TROLLEYS_CREATE, Permission.TROLLEYS_ASSIGN,
+                Permission.LABELS_VIEW, Permission.LABELS_PRINT
+        ));
+    }
+
+    private void upsertRole(String roleName, EnumSet<Permission> permissions) {
+        Role role = roleRepository.findByNameIgnoreCase(roleName).orElseGet(Role::new);
+        role.setName(roleName);
+        role.setPermissions(EnumSet.copyOf(permissions));
+        roleRepository.save(role);
+    }
+
+    private void seedUser(String username, String password, String roleName) {
         User u = userRepository.findByUsername(username).orElseGet(User::new);
+        Role role = roleRepository.findByName(roleName).orElseThrow();
         u.setUsername(username);
         u.setPassword(passwordEncoder.encode(password));
         u.setRole(role);

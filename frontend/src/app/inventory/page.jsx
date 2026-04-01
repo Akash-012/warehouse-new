@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { exportWmsWorkbook } from '@/lib/exportExcel';
 
 const INVENTORY_STATES = ['AVAILABLE', 'RECEIVED', 'IN_PUTAWAY', 'RESERVED', 'PICKED', 'PACKED', 'SHIPPED'];
 
@@ -56,27 +57,31 @@ function SortableHead({ field, label, sortField, sortDir, onSort }) {
   );
 }
 
-function exportToExcel(items) {
-  const BOM = '\uFEFF';
-  const headers = ['SKU', 'Barcode', 'Bin', 'State', 'Batch', 'Quantity', 'Updated At'];
-  const rows = items.map((item) => [
-    item.skuCode ?? item.sku ?? '',
-    item.barcode ?? '',
-    item.binBarcode ?? item.bin ?? '',
-    item.state ?? '',
-    item.batchNo ?? item.batch ?? '',
-    item.quantity ?? '',
-    item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM yyyy HH:mm') : '',
-  ]);
-  const csvContent = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `inventory_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-  toast.success('Inventory exported');
+async function exportToExcel(items) {
+  await exportWmsWorkbook({
+    fileName: `inventory_${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
+    sheetName: 'Inventory',
+    title: 'WMS Inventory Export',
+    columns: [
+      { header: 'SKU', key: 'skuCode', width: 16 },
+      { header: 'Barcode', key: 'barcode', width: 24 },
+      { header: 'Bin', key: 'binBarcode', width: 16 },
+      { header: 'State', key: 'state', width: 14, align: 'center' },
+      { header: 'Batch', key: 'batchNo', width: 20 },
+      { header: 'Quantity', key: 'quantity', width: 12, align: 'right' },
+      { header: 'Updated At', key: 'updatedAt', width: 20, align: 'center' },
+    ],
+    rows: items.map((item) => ({
+      skuCode: item.skuCode ?? item.sku ?? '',
+      barcode: item.barcode ?? '',
+      binBarcode: item.binBarcode ?? item.bin ?? '',
+      state: item.state ?? '',
+      batchNo: item.batchNo ?? item.batch ?? '',
+      quantity: item.quantity ?? '',
+      updatedAt: item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM yyyy HH:mm') : '',
+    })),
+  });
+  toast.success('Inventory exported to Excel');
 }
 
 export default function InventoryPage() {

@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useMutation, useQuery } from '@tanstack/react-query';
@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { ScanInput } from '@/components/ui/ScanInput';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,16 +16,13 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  ScanLine,
   PackageCheck,
   ArrowRight,
   CheckCircle2,
-  Box,
   Check,
   Printer,
   RotateCcw,
   List,
-  AlertCircle,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -35,7 +32,6 @@ export default function PackingPage() {
   const [manifest, setManifest] = useState(null);
   const [scanProgress, setScanProgress] = useState({});
 
-  // Fetch orders ready to pack (PICKED status)
   const { data: packQueue, isLoading: queueLoading } = useQuery({
     queryKey: ['pack-queue'],
     queryFn: () => api.get('/orders').then((r) =>
@@ -48,15 +44,13 @@ export default function PackingPage() {
 
   const startMutation = useMutation({
     mutationFn: ({ trolley, compartment }) =>
-      api
-        .post(
-          `/packing/start?trolleyBarcode=${encodeURIComponent(trolley)}&compartmentBarcode=${encodeURIComponent(compartment)}`,
-        )
-        .then((r) => r.data),
+      api.post(
+        `/packing/start?trolleyBarcode=${encodeURIComponent(trolley)}&compartmentBarcode=${encodeURIComponent(compartment)}`,
+      ).then((r) => r.data),
     onSuccess: (data) => {
       setManifest(data);
       setScanProgress({});
-      toast.success(`Manifest loaded â€” Order #${data.orderId}`);
+      toast.success(`Manifest loaded — Order #${data.orderId}`);
     },
     onError: () => toast.error('Failed to load packing manifest'),
   });
@@ -75,25 +69,16 @@ export default function PackingPage() {
       if (result.complete) {
         toast.success('Packing complete! All items packed.');
       } else {
-        toast.success(`Item packed â€” ${result.remaining} remaining`);
+        toast.success(`Item packed — ${result.remaining} remaining`);
       }
     },
-    onError: () => toast.error('Scan failed â€” item not found in manifest'),
+    onError: () => toast.error('Scan failed — item not found in manifest'),
   });
 
   const handleLoadManifest = (e) => {
     e.preventDefault();
     if (trolleyBarcode && compartmentBarcode) {
       startMutation.mutate({ trolley: trolleyBarcode, compartment: compartmentBarcode });
-    }
-  };
-
-  const handleScan = (e) => {
-    e.preventDefault();
-    const barcode = e.target.elements.itemBarcode.value.trim();
-    if (barcode) {
-      scanMutation.mutate(barcode);
-      e.target.reset();
     }
   };
 
@@ -117,11 +102,11 @@ export default function PackingPage() {
       <style>body{font-family:sans-serif;padding:24px;color:#111}h2{margin:0 0 4px}p{margin:2px 0;color:#555;font-size:13px}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{border:1px solid #ddd;padding:8px 12px;text-align:left;font-size:13px}th{background:#f5f5f5}@media print{.no-print{display:none}}</style>
       </head><body>
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div><h2>Packing Slip</h2><p>Order #${manifest.orderId}</p>${manifest.customerName ? `<p>Customer: ${manifest.customerName}</p>` : ''}</div>
+        <div><h2>Packing Slip</h2><p>Order #${manifest.orderId}</p>${manifest.customerName ? '<p>Customer: ' + manifest.customerName + '</p>' : ''}</div>
         <div style="text-align:right"><p style="font-size:12px">Date: ${new Date().toLocaleDateString()}</p></div>
       </div>
       <table><thead><tr><th>#</th><th>SKU</th><th>Expected Qty</th><th>Packed Qty</th></tr></thead><tbody>
-      ${manifest.lines.map((l, i) => `<tr><td>${i + 1}</td><td>${l.skuCode}</td><td>${l.expectedQty}</td><td>${scanProgress[l.skuCode] || 0}</td></tr>`).join('')}
+      ${manifest.lines.map((l, i) => '<tr><td>' + (i+1) + '</td><td>' + l.skuCode + '</td><td>' + l.expectedQty + '</td><td>' + (scanProgress[l.skuCode] || 0) + '</td></tr>').join('')}
       </tbody></table>
       <p style="margin-top:20px;font-size:12px;color:#888">All items verified and packed by warehouse team.</p>
       <button class="no-print" onclick="window.print()" style="margin-top:12px;padding:8px 16px;cursor:pointer">Print</button>
@@ -134,7 +119,7 @@ export default function PackingPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader title="Packing" description="Load manifests and verify items before dispatch." />
-      {/* Packing Queue */}
+
       <div className="glass-card rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -181,30 +166,35 @@ export default function PackingPage() {
         <div className="glass-card rounded-2xl p-5 flex flex-col gap-5">
           <div className="flex items-center gap-2">
             <PackageCheck className="size-4 text-primary" />
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-              Load Manifest
-            </h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Load Manifest</h2>
           </div>
 
           <form onSubmit={handleLoadManifest} className="flex flex-col gap-4">
-            <div className="relative">
-              <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-              <Input className="pl-9 font-mono text-sm" placeholder="Trolley barcode" value={trolleyBarcode} onChange={(e) => setTrolleyBarcode(e.target.value)} disabled={!!manifest} />
-            </div>
-            <div className="relative">
-              <Box className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-              <Input className="pl-9 font-mono text-sm" placeholder="Compartment barcode" value={compartmentBarcode} onChange={(e) => setCompartmentBarcode(e.target.value)} disabled={!!manifest} />
-            </div>
-
+            <ScanInput
+              className="font-mono text-sm"
+              placeholder="Trolley barcode"
+              value={trolleyBarcode}
+              onChange={setTrolleyBarcode}
+              onScan={setTrolleyBarcode}
+              disabled={!!manifest}
+              clearAfterScan={false}
+            />
+            <ScanInput
+              className="font-mono text-sm"
+              placeholder="Compartment barcode"
+              value={compartmentBarcode}
+              onChange={setCompartmentBarcode}
+              onScan={setCompartmentBarcode}
+              disabled={!!manifest}
+              clearAfterScan={false}
+            />
             {!manifest ? (
               <Button type="submit" disabled={startMutation.isPending || !trolleyBarcode || !compartmentBarcode} className="w-full">
-                <ArrowRight className="size-4 mr-2" />
-                Load Manifest
+                <ArrowRight className="size-4 mr-2" /> Load Manifest
               </Button>
             ) : (
               <Button type="button" variant="outline" className="w-full" onClick={handleReset}>
-                <RotateCcw className="size-3.5 mr-2" />
-                Clear and Start Over
+                <RotateCcw className="size-3.5 mr-2" /> Clear and Start Over
               </Button>
             )}
           </form>
@@ -229,17 +219,18 @@ export default function PackingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Progress</span>
-                  <span className={`font-semibold ${isComplete ? 'text-emerald-500' : 'text-primary'}`}>{totalScanned} / {totalExpected} units</span>
+                  <span className={`font-semibold ${isComplete ? 'text-emerald-500' : 'text-primary'}`}>
+                    {totalScanned} / {totalExpected} units
+                  </span>
                 </div>
               </div>
-
-              <form onSubmit={handleScan} className="flex gap-2">
-                <div className="relative flex-1">
-                  <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                  <Input name="itemBarcode" className="pl-9 font-mono text-sm" placeholder="Scan item barcode" autoFocus disabled={isComplete} />
-                </div>
-                <Button type="submit" disabled={scanMutation.isPending || isComplete}>Pack</Button>
-              </form>
+              <ScanInput
+                onScan={(val) => { if (val) scanMutation.mutate(val); }}
+                placeholder="Scan item barcode and press Enter..."
+                autoFocus
+                disabled={isComplete || scanMutation.isPending}
+                className="font-mono text-sm"
+              />
             </>
           )}
         </div>
@@ -258,11 +249,11 @@ export default function PackingPage() {
                   <span className={`font-bold ${isComplete ? 'text-emerald-500' : 'text-primary'}`}>{globalProgress}%</span>
                 </div>
                 <Progress value={globalProgress} className={`h-2.5 ${isComplete ? '[&>div]:bg-emerald-500' : ''}`} />
-                <p className="text-xs text-muted-foreground mt-1.5">{totalScanned} of {totalExpected} items packed across {manifest.lines.length} SKU{manifest.lines.length !== 1 ? 's' : ''}</p>
+                <p className="text-xs text-muted-foreground mt-1.5">
+                  {totalScanned} of {totalExpected} items packed across {manifest.lines.length} SKU{manifest.lines.length !== 1 ? 's' : ''}
+                </p>
               </div>
-
               <Separator />
-
               {isComplete ? (
                 <div className="flex flex-col items-center gap-3 py-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                   <CheckCircle2 className="size-14 text-emerald-500" />
@@ -296,9 +287,13 @@ export default function PackingPage() {
                             ) : (
                               <span className="size-5 rounded-full border-2 border-border shrink-0" />
                             )}
-                            <span className={`font-mono font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>{line.skuCode}</span>
+                            <span className={`font-mono font-medium ${done ? 'line-through text-muted-foreground' : ''}`}>
+                              {line.skuCode}
+                            </span>
                           </div>
-                          <span className={`text-xs tabular-nums ${done ? 'text-emerald-500' : 'text-muted-foreground'}`}>{scanned} / {line.expectedQty}</span>
+                          <span className={`text-xs tabular-nums ${done ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+                            {scanned} / {line.expectedQty}
+                          </span>
                         </div>
                         <Progress value={pct} className={`h-1.5 ${done ? '[&>div]:bg-emerald-500' : ''}`} />
                       </div>

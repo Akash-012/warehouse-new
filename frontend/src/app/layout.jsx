@@ -1,15 +1,7 @@
-'use client';
-
 import { Inter, JetBrains_Mono } from 'next/font/google';
-import { usePathname, useRouter } from 'next/navigation';
-import { QueryClientProvider } from '@tanstack/react-query';
-import { ThemeProvider } from 'next-themes';
-import { Toaster } from 'sonner';
-import Sidebar from '../components/Sidebar';
-import { TooltipProvider } from '@/components/ui/tooltip';
-import { CommandPalette } from '@/components/ui/CommandPalette';
 import { cn } from '@/lib/utils';
-import queryClient from '../lib/queryClient';
+import AppProviders from '@/components/AppProviders';
+import AppShellClient from '@/components/AppShellClient';
 import './globals.css';
 
 /** Inter — primary sans-serif, maps to --font-sans CSS var */
@@ -28,28 +20,6 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ['400', '500'],
 });
 
-const PUBLIC_ROUTES = ['/login'];
-
-function AppShell({ children }) {
-  const pathname = usePathname();
-  const router   = useRouter();
-  const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
-
-  if (isPublicRoute) return <>{children}</>;
-
-  return (
-    <div className="flex min-h-screen bg-background text-foreground">
-      <CommandPalette onNavigate={(href) => router.push(href)} />
-      <Sidebar />
-      <main className="flex-1 overflow-x-hidden">
-        <div className="min-h-screen px-4 pt-3 pb-5 sm:px-6 sm:pt-3 sm:pb-6 md:px-8 md:pt-3 md:pb-7">
-          {children}
-        </div>
-      </main>
-    </div>
-  );
-}
-
 export default function RootLayout({ children }) {
   return (
     <html
@@ -58,23 +28,9 @@ export default function RootLayout({ children }) {
       className={cn(inter.variable, jetbrainsMono.variable)}
     >
       <body className="font-sans antialiased">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <QueryClientProvider client={queryClient}>
-            <TooltipProvider delayDuration={200}>
-              <AppShell>{children}</AppShell>
-              <Toaster
-                richColors
-                position="top-right"
-                toastOptions={{ style: { fontFamily: 'var(--font-sans)' } }}
-              />
-            </TooltipProvider>
-          </QueryClientProvider>
-        </ThemeProvider>
+        <AppProviders>
+          <AppShellClient>{children}</AppShellClient>
+        </AppProviders>
       </body>
     </html>
   );

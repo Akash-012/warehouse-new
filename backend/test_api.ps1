@@ -1,166 +1,221 @@
-$base = "http://localhost:8080/api"
-$ErrorActionPreference = "SilentlyContinue"
+param(
+    [string]$BaseUrl = "http://localhost:8080/api",
+    [string]$Username = "admin",
+    [string]$Password = "admin123"
+)
 
-function Invoke-API {
-    param($method, $path, $body = $null, $token = $null)
+$ErrorActionPreference = "Stop"
+
+function Write-Step {
+    param([string]$Message)
+    Write-Host "`n[STEP] $Message" -ForegroundColor Yellow
+}
+
+function Invoke-Api {
+    param(
+        [Parameter(Mandatory = $true)][string]$Method,
+        [Parameter(Mandatory = $true)][string]$Path,
+        [object]$Body = $null,
+        [string]$Token = $null
+    )
+
     $headers = @{ "Content-Type" = "application/json" }
-    if ($token) { $headers["Authorization"] = "Bearer $token" }
+    if ($Token) { $headers["Authorization"] = "Bearer $Token" }
+
     try {
-        if ($body) {
-            return Invoke-RestMethod -Uri "$base$path" -Method $method -Headers $headers -Body ($body | ConvertTo-Json -Depth 10) -TimeoutSec 10
-        } else {
-            return Invoke-RestMethod -Uri "$base$path" -Method $method -Headers $headers -TimeoutSec 10
+        if ($null -ne $Body) {
+            return Invoke-RestMethod -Uri "$BaseUrl$Path" -Method $Method -Headers $headers -Body ($Body | ConvertTo-Json -Depth 10) -TimeoutSec 20
         }
-    } catch {
-        $stream = $_.Exception.Response.GetResponseStream()
-        if ($stream) {
-            $reader = [System.IO.StreamReader]::new($stream)
-            return "ERROR $($_.Exception.Response.StatusCode): $($reader.ReadToEnd())"
+        return Invoke-RestMethod -Uri "$BaseUrl$Path" -Method $Method -Headers $headers -TimeoutSec 20
+    }
+    catch {
+        $status = "UNKNOWN"
+        $msg = $_.Exception.Message
+        if ($_.Exception.Response) {
+            $status = [string]$_.Exception.Response.StatusCode
+            try {
+                $reader = New-Object System.IO.StreamReader($_.Exception.Response.GetResponseStream())
+                $bodyText = $reader.ReadToEnd()
+                if ($bodyText) { $msg = $bodyText }
+            } catch { }
         }
-        return "ERROR: $($_.Exception.Message)"
+        throw "API $Method $Path failed [$status] $msg"
     }
 }
 
-Write-Host "============================================" -ForegroundColor Cyan
-Write-Host " WMS API FULL WORKFLOW TEST" -ForegroundColor Cyan
-Write-Host "============================================" -ForegroundColor Cyan
-
-# STEP 1 - Login
-Write-Host "`n[STEP 1] POST /auth/login" -ForegroundColor Yellow
-$loginResult = Invoke-RestMethod -Uri "$base/auth/login" -Method POST -ContentType "application/json" -Body '{"username":"admin","password":"admin123"}' -TimeoutSec 10
-$token = $loginResult.token
-if ($token) { Write-Host "  OK Logged in | token $($token.Length) chars" -ForegroundColor Green }
-else { Write-Host "  FAIL - no token"; exit 1 }
-
-# STEP 2 - Dashboard KPIs
-Write-Host "`n[STEP 2] GET /dashboard/kpis" -ForegroundColor Yellow
-$kpis = Invoke-API GET "/dashboard/kpis" -token $token
-if ($kpis -is [string]) { Write-Host "  $kpis" } else {
-    Write-Host "  OK totalSkus=$($kpis.totalSkus) openOrders=$($kpis.openOrders) pendingPicks=$($kpis.pendingPicks) available=$($kpis.inventoryByState.AVAILABLE)" -ForegroundColor Green
-}
-
-# STEP 3 - List Purchase Orders
-Write-Host "`n[STEP 3] GET /purchase-orders" -ForegroundColor Yellow
-$pos = Invoke-API GET "/purchase-orders" -token $token
-if ($pos -is [string]) { Write-Host "  $pos" } else {
-    Write-Host "  OK $($pos.Count) purchase orders:" -ForegroundColor Green
-    $pos | ForEach-Object { Write-Host "    [$($_.id)] $($_.poNumber) | $($_.supplier) | status=$($_.status)" }
-}
-
-# STEP 4 - Receive PO (PO-2026-003, id=3, PENDING) - has skuIds 6,7,8
-Write-Host "`n[STEP 4] POST /inbound/receive (PO id=3, skuId=6 qty=2, skuId=7 qty=2)" -ForegroundColor Yellow
-$receiveBody = @{
-    poId  = 3
-    lines = @(
-        @{ skuId = 6; quantity = 2; batchNo = "BATCH-TEST-01" }
-        @{ skuId = 7; quantity = 2; batchNo = "BATCH-TEST-01" }
+function Test-Api {
+    param(
+        [Parameter(Mandatory = $true)][string]$Name,
+        [Parameter(Mandatory = $true)][ScriptBlock]$Action,
+        [bool]$Optional = $false
     )
-}
-$grn = Invoke-API POST "/inbound/receive" $receiveBody $token
-if ($grn -is [string]) { Write-Host "  $grn" }
-else { Write-Host "  OK GRN=$($grn.grnNo) totalItems=$($grn.totalItemsReceived)" -ForegroundColor Green }
 
-# STEP 4b - Get GRN 1
-Write-Host "`n[STEP 4b] GET /inbound/grn/1" -ForegroundColor Yellow
-$grn1 = Invoke-API GET "/inbound/grn/1" -token $token
-if ($grn1 -is [string]) { Write-Host "  $grn1" }
-else { Write-Host "  OK grnNo=$($grn1.grnNo) lines=$($grn1.lines.Count)" -ForegroundColor Green }
-
-# STEP 5 - Inventory List
-Write-Host "`n[STEP 5] GET /inventory?page=0&size=5" -ForegroundColor Yellow
-$inv = Invoke-API GET "/inventory?page=0&size=5" -token $token
-if ($inv -is [string]) { Write-Host "  $inv" } else {
-    Write-Host "  OK Total inventory items: $($inv.totalElements)" -ForegroundColor Green
-    $inv.content | ForEach-Object { Write-Host "    [$($_.id)] $($_.skuCode) | bin=$($_.binBarcode) | state=$($_.state) | qty=$($_.quantity)" }
+    try {
+        $result = & $Action
+        Write-Host "  OK $Name" -ForegroundColor Green
+        return @{ ok = $true; optional = $Optional; result = $result }
+    }
+    catch {
+        if ($Optional) {
+            Write-Host "  WARN $Name -> $($_.Exception.Message)" -ForegroundColor DarkYellow
+            return @{ ok = $false; optional = $true; result = $null }
+        }
+        Write-Host "  FAIL $Name -> $($_.Exception.Message)" -ForegroundColor Red
+        return @{ ok = $false; optional = $false; result = $null }
+    }
 }
 
-# STEP 6 - List Orders
-Write-Host "`n[STEP 6] GET /orders" -ForegroundColor Yellow
-$orders = Invoke-API GET "/orders" -token $token
-if ($orders -is [string]) { Write-Host "  $orders" } else {
-    Write-Host "  OK $($orders.Count) sales orders:" -ForegroundColor Green
-    $orders | ForEach-Object { Write-Host "    [$($_.id)] customer=$($_.customerName) | status=$($_.status)" }
-}
-
-# STEP 7 - Create New Sales Order
-Write-Host "`n[STEP 7] POST /orders (create new sales order)" -ForegroundColor Yellow
-$orderBody = @{
-    customerName = "Test Customer API"
-    lines        = @(
-        @{ skuId = 1; quantity = 1 }
-        @{ skuId = 2; quantity = 1 }
+function Ensure-ByName {
+    param(
+        [Parameter(Mandatory = $true)]$List,
+        [Parameter(Mandatory = $true)][string]$Key,
+        [Parameter(Mandatory = $true)][string]$Value,
+        [Parameter(Mandatory = $true)][ScriptBlock]$CreateAction
     )
-}
-$newOrder = Invoke-API POST "/orders" $orderBody $token
-if ($newOrder -is [string]) { Write-Host "  $newOrder" }
-else { Write-Host "  OK orderId=$($newOrder.orderId) soNumber=$($newOrder.soNumber) status=$($newOrder.status) pickTasks=$($newOrder.pickTaskIds.Count)" -ForegroundColor Green }
 
-# STEP 8 - Pick Tasks for Order 1
-Write-Host "`n[STEP 8] GET /orders/1/pick-tasks" -ForegroundColor Yellow
-$picks = Invoke-API GET "/orders/1/pick-tasks" -token $token
-if ($picks -is [string]) { Write-Host "  $picks" } else {
-    Write-Host "  OK $($picks.Count) pick tasks for order 1:" -ForegroundColor Green
-    $picks | Select-Object -First 5 | ForEach-Object { Write-Host "    [$($_.id)] sku=$($_.skuCode) | bin=$($_.binBarcode) | qty=$($_.quantity) | status=$($_.state)" }
+    $existing = $List | Where-Object { [string]($_.$Key) -eq $Value } | Select-Object -First 1
+    if ($existing) { return $existing }
+    return & $CreateAction
 }
 
-# STEP 9 - Pending Pick Tasks
-Write-Host "`n[STEP 9] GET /picking/tasks/pending (first 3)" -ForegroundColor Yellow
-$pending = Invoke-API GET "/picking/tasks/pending" -token $token
-if ($pending -is [string]) { Write-Host "  $pending" } else {
-    Write-Host "  OK $($pending.Count) pending tasks" -ForegroundColor Green
-    $pending | Select-Object -First 3 | ForEach-Object { Write-Host "    [$($_.id)] sku=$($_.skuCode) bin=$($_.binBarcode) qty=$($_.quantityToPick)" }
-}
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host " WMS DEMO SEED + API SMOKE TEST" -ForegroundColor Cyan
+Write-Host "============================================" -ForegroundColor Cyan
+Write-Host "Base URL: $BaseUrl" -ForegroundColor DarkCyan
 
-# STEP 10 - Master Data
-Write-Host "`n[STEP 10a] GET /master/warehouses" -ForegroundColor Yellow
-$wh = Invoke-API GET "/master/warehouses" -token $token
-if ($wh -is [string]) { Write-Host "  $wh" } else { Write-Host "  OK $($wh.Count) warehouses" -ForegroundColor Green }
-
-Write-Host "`n[STEP 10b] GET /master/bins?page=0&size=5" -ForegroundColor Yellow
-$bins = Invoke-API GET "/master/bins?page=0&size=5" -token $token
-if ($bins -is [string]) { Write-Host "  $bins" } else { Write-Host "  OK Total bins: $($bins.totalElements)" -ForegroundColor Green }
-
-# STEP 11 - Create Trolley
-Write-Host "`n[STEP 11] POST /trolleys (create new trolley)" -ForegroundColor Yellow
+$results = @()
 $ts = Get-Date -Format "yyyyMMddHHmmss"
-$trolleyBody = @{
-    trolleyBarcode       = "TROLLEY-TEST-$ts"
-    compartmentBarcodes  = @("COMP-A1R1-01", "COMP-A1R1-02", "COMP-A1R2-01")
+$demoSuffix = $ts.Substring($ts.Length - 6)
+
+Write-Step "Authenticate"
+$login = Test-Api -Name "POST /auth/login" -Action {
+    Invoke-RestMethod -Uri "$BaseUrl/auth/login" -Method POST -ContentType "application/json" -Body (@{ username = $Username; password = $Password } | ConvertTo-Json)
 }
-$newTrolley = Invoke-API POST "/trolleys" $trolleyBody $token
-if ($newTrolley -is [string]) { Write-Host "  $newTrolley" }
-else { Write-Host "  OK trolleyId=$($newTrolley.id) identifier=$($newTrolley.trolleyIdentifier)" -ForegroundColor Green }
+$results += $login
+if (-not $login.ok -or -not $login.result.token) {
+    Write-Host "`nCannot continue without auth token." -ForegroundColor Red
+    exit 1
+}
+$token = $login.result.token
 
-# STEP 12 - Get Trolley Contents
-Write-Host "`n[STEP 12] GET /trolleys/{barcode}/compartments" -ForegroundColor Yellow
-$trolleyBarcode = "TROLLEY-TEST-$ts"
-$comp = Invoke-API GET "/trolleys/$trolleyBarcode/compartments" -token $token
-if ($comp -is [string]) { Write-Host "  $comp" } else { Write-Host "  OK $($comp.Count) compartments" -ForegroundColor Green }
+Write-Step "Read baseline endpoints"
+$results += Test-Api -Name "GET /dashboard/kpis" -Action { Invoke-Api GET "/dashboard/kpis" $null $token }
+$results += Test-Api -Name "GET /reports/kpis" -Action { Invoke-Api GET "/reports/kpis" $null $token }
+$results += Test-Api -Name "GET /reports/inventory-by-state" -Action { Invoke-Api GET "/reports/inventory-by-state" $null $token }
+$results += Test-Api -Name "GET /inventory?page=0&size=10" -Action { Invoke-Api GET "/inventory?page=0&size=10" $null $token }
+$results += Test-Api -Name "GET /purchase-orders" -Action { Invoke-Api GET "/purchase-orders" $null $token }
 
-# STEP 13 - Reports
-Write-Host "`n[STEP 13] GET /reports/kpis" -ForegroundColor Yellow
-$rkpis = Invoke-API GET "/reports/kpis" -token $token
-if ($rkpis -is [string]) { Write-Host "  $rkpis" }
-else { Write-Host "  OK totalSkus=$($rkpis.totalSkus) openOrders=$($rkpis.openOrders) pendingPicks=$($rkpis.pendingPicks)" -ForegroundColor Green }
+Write-Step "Ensure demo master hierarchy exists"
+$warehouses = Invoke-Api GET "/master/warehouses" $null $token
+$warehouseName = "Demo Warehouse $demoSuffix"
+$warehouse = Ensure-ByName -List $warehouses -Key "name" -Value $warehouseName -CreateAction {
+    Invoke-Api POST "/master/warehouses" @{ name = $warehouseName; location = "Demo City" } $token
+}
+Write-Host "  Warehouse: $($warehouse.name) (id=$($warehouse.id))" -ForegroundColor Green
 
-Write-Host "`n[STEP 13b] GET /reports/inventory-by-state" -ForegroundColor Yellow
-$rInv = Invoke-API GET "/reports/inventory-by-state" -token $token
-if ($rInv -is [string]) { Write-Host "  $rInv" } else {
-    $rInv.PSObject.Properties | ForEach-Object { Write-Host "    $($_.Name): $($_.Value)" }
+$zones = Invoke-Api GET "/master/zones" $null $token
+$zoneName = "Demo Zone $demoSuffix"
+$zone = Ensure-ByName -List $zones -Key "name" -Value $zoneName -CreateAction {
+    Invoke-Api POST "/master/zones" @{ name = $zoneName; warehouseId = $warehouse.id } $token
+}
+Write-Host "  Zone: $($zone.name) (id=$($zone.id))" -ForegroundColor Green
+
+$aisles = Invoke-Api GET "/master/aisles" $null $token
+$aisleCode = "D-$demoSuffix"
+$aisle = Ensure-ByName -List $aisles -Key "aisleNumber" -Value $aisleCode -CreateAction {
+    Invoke-Api POST "/master/aisles" @{ aisleNumber = $aisleCode; zoneId = $zone.id } $token
+}
+Write-Host "  Aisle: $($aisle.aisleNumber) (id=$($aisle.id))" -ForegroundColor Green
+
+$racks = Invoke-Api GET "/master/racks" $null $token
+$rackCode = "R-$demoSuffix"
+$rack = Ensure-ByName -List $racks -Key "rackIdentifier" -Value $rackCode -CreateAction {
+    Invoke-Api POST "/master/racks" @{ rackIdentifier = $rackCode; aisleId = $aisle.id } $token
+}
+Write-Host "  Rack: $($rack.rackIdentifier) (id=$($rack.id))" -ForegroundColor Green
+
+$bins = Invoke-Api GET "/master/bins" $null $token
+$binCode = "BIN-$demoSuffix-01"
+$bin = ($bins | Where-Object { $_.barcode -eq $binCode } | Select-Object -First 1)
+if (-not $bin) {
+    $bin = Invoke-Api POST "/master/bins" @{
+        rackId = $rack.id
+        barcode = $binCode
+        lengthCm = 60
+        widthCm = 40
+        heightCm = 30
+        maxWeightG = 25000
+        status = "AVAILABLE"
+    } $token
+}
+Write-Host "  Bin: $($bin.barcode) (id=$($bin.id))" -ForegroundColor Green
+
+$results += @{ ok = $true; optional = $false; result = "master-seeded" }
+
+Write-Step "Create and validate sales order flow"
+$newOrder = $null
+$orderCreate = Test-Api -Name "POST /orders" -Action {
+    Invoke-Api POST "/orders" @{
+        customerName = "Demo Customer $demoSuffix"
+        lines = @(
+            @{ skuCode = "SKU-001"; quantity = 1 },
+            @{ skuCode = "SKU-002"; quantity = 2 }
+        )
+    } $token
+}
+$results += $orderCreate
+if ($orderCreate.ok) {
+    $newOrder = $orderCreate.result
+    $newOrderId = $newOrder.orderId
+    if (-not $newOrderId) { $newOrderId = $newOrder.id }
+
+    if ($newOrderId) {
+        $results += Test-Api -Name "GET /orders/$newOrderId" -Action { Invoke-Api GET "/orders/$newOrderId" $null $token }
+        $results += Test-Api -Name "GET /orders/$newOrderId/pick-tasks" -Action { Invoke-Api GET "/orders/$newOrderId/pick-tasks" $null $token }
+    }
 }
 
-# STEP 14 - PUT Update Order Status
-Write-Host "`n[STEP 14] PUT /master/warehouses/1 (update warehouse name)" -ForegroundColor Yellow
-$wUpdate = Invoke-API PUT "/master/warehouses/1" @{ name = "Main Warehouse (Updated)"; location = "Zone A" } $token
-if ($wUpdate -is [string]) { Write-Host "  $wUpdate" }
-else { Write-Host "  OK id=$($wUpdate.id) name=$($wUpdate.name)" -ForegroundColor Green }
+$results += Test-Api -Name "GET /orders" -Action { Invoke-Api GET "/orders" $null $token }
+$results += Test-Api -Name "GET /picking/tasks/pending" -Action { Invoke-Api GET "/picking/tasks/pending" $null $token }
 
-# STEP 15 - Revert warehouse name
-Write-Host "`n[STEP 15] PUT /master/warehouses/1 (revert name)" -ForegroundColor Yellow
-$wRevert = Invoke-API PUT "/master/warehouses/1" @{ name = "Main Warehouse"; location = "Zone A" } $token
-if ($wRevert -is [string]) { Write-Host "  $wRevert" }
-else { Write-Host "  OK reverted to: $($wRevert.name)" -ForegroundColor Green }
+Write-Step "Optional operational endpoints"
+$results += Test-Api -Name "POST /inbound/receive" -Optional $true -Action {
+    $pos = Invoke-Api GET "/purchase-orders" $null $token
+    if (-not $pos -or $pos.Count -eq 0) { throw "No purchase orders available" }
+    $po = $pos | Where-Object { [string]$_.poNumber -like "*001*" } | Select-Object -First 1
+    if (-not $po) { $po = $pos | Select-Object -First 1 }
 
-Write-Host "`n============================================" -ForegroundColor Cyan
-Write-Host " ALL STEPS COMPLETE" -ForegroundColor Cyan
-Write-Host "============================================" -ForegroundColor Cyan
+    $skuCode = "SKU-001"
+    if ([string]$po.poNumber -like "*002*") { $skuCode = "SKU-006" }
+
+    Invoke-Api POST "/inbound/receive" @{
+        poId = $po.id
+        lines = @(
+            @{ skuCode = $skuCode; quantity = 1; batchNo = "BATCH-$demoSuffix" }
+        )
+    } $token
+}
+
+$results += Test-Api -Name "POST /trolleys" -Optional $true -Action {
+    Invoke-Api POST "/trolleys" @{
+        trolleyBarcode = "TROLLEY-DEMO-$demoSuffix"
+        compartmentBarcodes = @("COMP-A1R1-01", "COMP-A1R1-02", "COMP-A1R2-01")
+    } $token
+}
+
+Write-Step "Summary"
+$requiredFailed = ($results | Where-Object { -not $_.ok -and -not $_.optional }).Count
+$optionalFailed = ($results | Where-Object { -not $_.ok -and $_.optional }).Count
+$passed = ($results | Where-Object { $_.ok }).Count
+
+Write-Host "  Passed:   $passed" -ForegroundColor Green
+Write-Host "  Optional warnings: $optionalFailed" -ForegroundColor DarkYellow
+Write-Host "  Required failures: $requiredFailed" -ForegroundColor Red
+
+if ($requiredFailed -gt 0) {
+    Write-Host "`nSmoke test FAILED. Fix required endpoint issues before demo." -ForegroundColor Red
+    exit 2
+}
+
+Write-Host "`nSmoke test PASSED. Demo data is ready and core APIs are healthy." -ForegroundColor Cyan
+exit 0

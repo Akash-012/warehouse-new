@@ -4,10 +4,11 @@
 		{
 			"label": "backend: run",
 			"type": "shell",
-			"command": "mvn spring-boot:run",
+			"command": "${workspaceFolder}/tools/apache-maven-3.9.6/bin/mvn.cmd spring-boot:run",
 			"options": {
 				"cwd": "${workspaceFolder}/backend",
 				"env": {
+					"JAVA_HOME": "C:/Program Files/Microsoft/jdk-21.0.10.7-hotspot",
 					"MAVEN_OPTS": "-Xms256m -Xmx512m"
 				}
 			},
@@ -17,9 +18,12 @@
 		{
 			"label": "backend: build",
 			"type": "shell",
-			"command": "mvn clean package -DskipTests",
+			"command": "${workspaceFolder}/tools/apache-maven-3.9.6/bin/mvn.cmd clean package -DskipTests",
 			"options": {
-				"cwd": "${workspaceFolder}/backend"
+				"cwd": "${workspaceFolder}/backend",
+				"env": {
+					"JAVA_HOME": "C:/Program Files/Microsoft/jdk-21.0.10.7-hotspot"
+				}
 			},
 			"group": "build",
 			"presentation": { "panel": "dedicated", "reveal": "always" }

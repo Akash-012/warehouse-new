@@ -1,6 +1,7 @@
 package com.warehouse.wms.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -15,13 +16,14 @@ public class Zone {
     private Long id;
     private String name;
 
-    @JsonIgnore
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     @ManyToOne
     @JoinColumn(name = "warehouse_id")
+    @JsonIgnoreProperties({"zones"})
     private Warehouse warehouse;
 
+    @JsonIgnore
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     @OneToMany(mappedBy = "zone")

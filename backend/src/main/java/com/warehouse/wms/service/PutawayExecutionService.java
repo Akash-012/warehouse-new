@@ -4,6 +4,7 @@ import com.warehouse.wms.dto.ExecutionResult;
 import com.warehouse.wms.entity.Bin;
 import com.warehouse.wms.entity.Inventory;
 import com.warehouse.wms.entity.MovementLog;
+import com.warehouse.wms.entity.Permission;
 import com.warehouse.wms.entity.PutawayTask;
 import com.warehouse.wms.entity.SkuDimension;
 import com.warehouse.wms.entity.User;
@@ -52,9 +53,7 @@ public class PutawayExecutionService {
                 .orElseThrow(() -> new EntityNotFoundException("Bin not found: " + binBarcode));
 
         String suggestedBarcode = task.getSuggestedBin() != null ? task.getSuggestedBin().getBarcode() : null;
-        boolean managerOverride = actor.getRole() == com.warehouse.wms.entity.Role.MANAGER
-                || actor.getRole() == com.warehouse.wms.entity.Role.ADMIN
-                || actor.getRole() == com.warehouse.wms.entity.Role.SUPER_ADMIN;
+        boolean managerOverride = actor.getRole().getPermissions().contains(Permission.INVENTORY_ADJUST);
         if (suggestedBarcode != null && !suggestedBarcode.equals(binBarcode) && !managerOverride) {
             throw new InventoryStateException("Scanned bin differs from suggested bin; manager override required");
         }

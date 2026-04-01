@@ -3,10 +3,10 @@ package com.warehouse.wms.controller;
 import com.warehouse.wms.dto.AuthRequest;
 import com.warehouse.wms.dto.AuthResponse;
 import com.warehouse.wms.dto.RegisterRequest;
-import com.warehouse.wms.entity.Role;
 import com.warehouse.wms.entity.User;
 import com.warehouse.wms.repository.UserRepository;
 import com.warehouse.wms.service.JwtService;
+import com.warehouse.wms.service.RoleService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -30,13 +30,15 @@ public class AuthController {
     private final UserRepository userRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final RoleService roleService;
 
     public AuthController(AuthenticationManager authenticationManager, UserRepository userRepository,
-                          JwtService jwtService, PasswordEncoder passwordEncoder) {
+                          JwtService jwtService, PasswordEncoder passwordEncoder, RoleService roleService) {
         this.authenticationManager = authenticationManager;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.passwordEncoder = passwordEncoder;
+        this.roleService = roleService;
     }
 
     @PostMapping("/login")
@@ -55,7 +57,7 @@ public class AuthController {
                 .map(Enum::name)
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getRole().name(), permissions));
+        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getRole().getName(), permissions));
     }
 
     @PostMapping("/register")
@@ -64,17 +66,10 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
         }
 
-        Role role;
-        try {
-            role = Role.valueOf(request.getRole());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role: " + request.getRole());
-        }
-
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(role);
+        user.setRole(roleService.findByNameOrThrow(request.getRole()));
         userRepository.save(user);
 
         final String token = jwtService.generateToken(user);
@@ -82,6 +77,6 @@ public class AuthController {
                 .map(Enum::name)
                 .collect(Collectors.toList());
 
-        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getRole().name(), permissions));
+        return ResponseEntity.ok(new AuthResponse(token, user.getUsername(), user.getRole().getName(), permissions));
     }
 }

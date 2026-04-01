@@ -100,27 +100,36 @@ export default function LoginPage() {
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
-                <div className="relative">
-                  <UserRound className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input id="username" className="pl-9" {...register('username')} />
+                <div className="relative group">
+                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors group-focus-within:text-primary">
+                    <UserRound className="size-4" />
+                  </span>
+                  <Input
+                    id="username"
+                    className="h-11 rounded-xl border-border/80 bg-background/80 pl-11 pr-3 text-sm shadow-sm transition-all focus-visible:ring-2"
+                    {...register('username')}
+                  />
                 </div>
                 {errors.username ? <p className="text-xs text-destructive">{errors.username.message}</p> : null}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <div className="relative group">
+                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors group-focus-within:text-primary">
+                    <LockKeyhole className="size-4" />
+                  </span>
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    className="pl-9 pr-10"
+                    className="h-11 rounded-xl border-border/80 bg-background/80 pl-12 pr-14 text-sm shadow-sm transition-all focus-visible:ring-2"
                     {...register('password')}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    className="absolute right-2 top-1/2 z-10 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted/70 hover:text-foreground"
                   >
                     {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                   </button>
@@ -133,12 +142,13 @@ export default function LoginPage() {
                 Continue to dashboard
               </Button>
 
-              <div className="rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground space-y-2">
+              <div className="space-y-2 rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between">
                   <p className="font-semibold text-foreground text-xs uppercase tracking-wide">Demo Credentials</p>
                   <button
                     type="button"
                     onClick={() => setShowDemoPasswords((v) => !v)}
+                    aria-label={showDemoPasswords ? 'Hide demo passwords' : 'Show demo passwords'}
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
                     {showDemoPasswords ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
@@ -157,10 +167,10 @@ export default function LoginPage() {
                       setValue('username', user);
                       setValue('password', pass);
                     }}
-                    className="flex w-full items-center justify-between rounded-lg px-3 py-1.5 hover:bg-muted transition-colors text-left"
+                    className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-muted"
                   >
-                    <span className="text-xs text-muted-foreground w-24">{role}</span>
-                    <span className="font-mono text-xs text-foreground">
+                    <span className="w-24 shrink-0 text-xs text-muted-foreground">{role}</span>
+                    <span className="truncate font-mono text-xs text-foreground">
                       {user} / {showDemoPasswords ? pass : '•'.repeat(pass.length)}
                     </span>
                   </button>

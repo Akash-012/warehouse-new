@@ -13,7 +13,9 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.springframework.http.HttpStatus.CONFLICT;
 
@@ -79,39 +81,39 @@ public class MasterDataController {
     @Operation(summary = "Create zone")
     @PostMapping("/zones")
     @PreAuthorize("hasAuthority('MASTER_MANAGE')")
-    public ResponseEntity<Zone> createZone(@Valid @RequestBody ZoneRequest request) {
+    public ResponseEntity<Map<String, Object>> createZone(@Valid @RequestBody ZoneRequest request) {
         Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
                 .orElseThrow(() -> new EntityNotFoundException("Warehouse not found: " + request.getWarehouseId()));
         Zone zone = new Zone();
         zone.setName(request.getName());
         zone.setWarehouse(warehouse);
-        return ResponseEntity.ok(zoneRepository.save(zone));
+        return ResponseEntity.ok(toZoneView(zoneRepository.save(zone)));
     }
 
     @Operation(summary = "List zones")
     @GetMapping("/zones")
-    public ResponseEntity<List<Zone>> listZones() {
-        return ResponseEntity.ok(zoneRepository.findAll());
+    public ResponseEntity<List<Map<String, Object>>> listZones() {
+        return ResponseEntity.ok(zoneRepository.findAll().stream().map(this::toZoneView).toList());
     }
 
     @Operation(summary = "Get zone by id")
     @GetMapping("/zones/{id}")
-    public ResponseEntity<Zone> getZone(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> getZone(@PathVariable Long id) {
         Zone zone = zoneRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Zone not found: " + id));
-        return ResponseEntity.ok(zone);
+        return ResponseEntity.ok(toZoneView(zone));
     }
 
     @Operation(summary = "Update zone")
     @PutMapping("/zones/{id}")
-    public ResponseEntity<Zone> updateZone(@PathVariable Long id, @Valid @RequestBody ZoneRequest request) {
+    public ResponseEntity<Map<String, Object>> updateZone(@PathVariable Long id, @Valid @RequestBody ZoneRequest request) {
         Zone zone = zoneRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Zone not found: " + id));
         Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
                 .orElseThrow(() -> new EntityNotFoundException("Warehouse not found: " + request.getWarehouseId()));
         zone.setName(request.getName());
         zone.setWarehouse(warehouse);
-        return ResponseEntity.ok(zoneRepository.save(zone));
+        return ResponseEntity.ok(toZoneView(zoneRepository.save(zone)));
     }
 
     @Operation(summary = "Delete zone")
@@ -126,39 +128,39 @@ public class MasterDataController {
 
     @Operation(summary = "Create aisle")
     @PostMapping("/aisles")
-    public ResponseEntity<Aisle> createAisle(@Valid @RequestBody AisleRequest request) {
+    public ResponseEntity<Map<String, Object>> createAisle(@Valid @RequestBody AisleRequest request) {
         Zone zone = zoneRepository.findById(request.getZoneId())
                 .orElseThrow(() -> new EntityNotFoundException("Zone not found: " + request.getZoneId()));
         Aisle aisle = new Aisle();
         aisle.setAisleNumber(request.getAisleNumber());
         aisle.setZone(zone);
-        return ResponseEntity.ok(aisleRepository.save(aisle));
+        return ResponseEntity.ok(toAisleView(aisleRepository.save(aisle)));
     }
 
     @Operation(summary = "List aisles")
     @GetMapping("/aisles")
-    public ResponseEntity<List<Aisle>> listAisles() {
-        return ResponseEntity.ok(aisleRepository.findAll());
+    public ResponseEntity<List<Map<String, Object>>> listAisles() {
+        return ResponseEntity.ok(aisleRepository.findAll().stream().map(this::toAisleView).toList());
     }
 
     @Operation(summary = "Get aisle by id")
     @GetMapping("/aisles/{id}")
-    public ResponseEntity<Aisle> getAisle(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> getAisle(@PathVariable Long id) {
         Aisle aisle = aisleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Aisle not found: " + id));
-        return ResponseEntity.ok(aisle);
+        return ResponseEntity.ok(toAisleView(aisle));
     }
 
     @Operation(summary = "Update aisle")
     @PutMapping("/aisles/{id}")
-    public ResponseEntity<Aisle> updateAisle(@PathVariable Long id, @Valid @RequestBody AisleRequest request) {
+    public ResponseEntity<Map<String, Object>> updateAisle(@PathVariable Long id, @Valid @RequestBody AisleRequest request) {
         Aisle aisle = aisleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Aisle not found: " + id));
         Zone zone = zoneRepository.findById(request.getZoneId())
                 .orElseThrow(() -> new EntityNotFoundException("Zone not found: " + request.getZoneId()));
         aisle.setAisleNumber(request.getAisleNumber());
         aisle.setZone(zone);
-        return ResponseEntity.ok(aisleRepository.save(aisle));
+        return ResponseEntity.ok(toAisleView(aisleRepository.save(aisle)));
     }
 
     @Operation(summary = "Delete aisle")
@@ -173,39 +175,72 @@ public class MasterDataController {
 
     @Operation(summary = "Create rack")
     @PostMapping("/racks")
-    public ResponseEntity<Rack> createRack(@Valid @RequestBody RackRequest request) {
+    public ResponseEntity<Map<String, Object>> createRack(@Valid @RequestBody RackRequest request) {
         Aisle aisle = aisleRepository.findById(request.getAisleId())
                 .orElseThrow(() -> new EntityNotFoundException("Aisle not found: " + request.getAisleId()));
         Rack rack = new Rack();
         rack.setRackIdentifier(request.getRackIdentifier());
         rack.setAisle(aisle);
-        return ResponseEntity.ok(rackRepository.save(rack));
+        return ResponseEntity.ok(toRackView(rackRepository.save(rack)));
     }
 
     @Operation(summary = "List racks")
     @GetMapping("/racks")
-    public ResponseEntity<List<Rack>> listRacks() {
-        return ResponseEntity.ok(rackRepository.findAll());
+    public ResponseEntity<List<Map<String, Object>>> listRacks() {
+        return ResponseEntity.ok(rackRepository.findAll().stream().map(this::toRackView).toList());
     }
 
     @Operation(summary = "Get rack by id")
     @GetMapping("/racks/{id}")
-    public ResponseEntity<Rack> getRack(@PathVariable Long id) {
+    public ResponseEntity<Map<String, Object>> getRack(@PathVariable Long id) {
         Rack rack = rackRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Rack not found: " + id));
-        return ResponseEntity.ok(rack);
+        return ResponseEntity.ok(toRackView(rack));
     }
 
     @Operation(summary = "Update rack")
     @PutMapping("/racks/{id}")
-    public ResponseEntity<Rack> updateRack(@PathVariable Long id, @Valid @RequestBody RackRequest request) {
+    public ResponseEntity<Map<String, Object>> updateRack(@PathVariable Long id, @Valid @RequestBody RackRequest request) {
         Rack rack = rackRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Rack not found: " + id));
         Aisle aisle = aisleRepository.findById(request.getAisleId())
                 .orElseThrow(() -> new EntityNotFoundException("Aisle not found: " + request.getAisleId()));
         rack.setRackIdentifier(request.getRackIdentifier());
         rack.setAisle(aisle);
-        return ResponseEntity.ok(rackRepository.save(rack));
+        return ResponseEntity.ok(toRackView(rackRepository.save(rack)));
+    }
+
+    private Map<String, Object> toZoneView(Zone zone) {
+        Map<String, Object> warehouse = new LinkedHashMap<>();
+        warehouse.put("id", zone.getWarehouse().getId());
+        warehouse.put("name", zone.getWarehouse().getName());
+        warehouse.put("location", zone.getWarehouse().getLocation());
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", zone.getId());
+        out.put("name", zone.getName());
+        out.put("warehouse", warehouse);
+        return out;
+    }
+
+    private Map<String, Object> toAisleView(Aisle aisle) {
+        Map<String, Object> zone = toZoneView(aisle.getZone());
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", aisle.getId());
+        out.put("aisleNumber", aisle.getAisleNumber());
+        out.put("zone", zone);
+        return out;
+    }
+
+    private Map<String, Object> toRackView(Rack rack) {
+        Map<String, Object> aisle = toAisleView(rack.getAisle());
+
+        Map<String, Object> out = new LinkedHashMap<>();
+        out.put("id", rack.getId());
+        out.put("rackIdentifier", rack.getRackIdentifier());
+        out.put("aisle", aisle);
+        return out;
     }
 
     @Operation(summary = "Delete rack")

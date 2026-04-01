@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { ScanInput } from '@/components/ui/ScanInput';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -36,7 +37,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import api from '@/lib/api';
+import { exportWmsWorkbook } from '@/lib/exportExcel';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
 const putawaySchema = z.object({
   itemBarcode: z.string().min(1, 'Item barcode is required'),
@@ -58,25 +61,25 @@ function PriorityBadge({ priority }) {
   );
 }
 
-function exportTasksCSV(tasks) {
-  const BOM = '\uFEFF';
-  const header = 'Priority,Item Barcode,Suggested Bin,SKU\n';
-  const rows = tasks
-    .map((t) =>
-      [
-        t.priority ?? '',
-        t.itemBarcode ?? t.inventoryBarcode ?? '',
-        t.suggestedBin ?? t.suggestedBinBarcode ?? '',
-        t.skuCode ?? '',
-      ].join(','),
-    )
-    .join('\n');
-  const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `putaway_tasks_${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  toast.success('Putaway tasks exported');
+async function exportTasksExcel(tasks) {
+  await exportWmsWorkbook({
+    fileName: `putaway_tasks_${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
+    sheetName: 'Putaway Tasks',
+    title: 'WMS Putaway Tasks Export',
+    columns: [
+      { header: 'Priority', key: 'priority', width: 12, align: 'center' },
+      { header: 'Item Barcode', key: 'itemBarcode', width: 24 },
+      { header: 'Suggested Bin', key: 'suggestedBin', width: 18 },
+      { header: 'SKU', key: 'skuCode', width: 16 },
+    ],
+    rows: tasks.map((t) => ({
+      priority: t.priority === 1 ? 'HIGH' : t.priority === 2 ? 'MEDIUM' : 'LOW',
+      itemBarcode: t.itemBarcode ?? t.inventoryBarcode ?? '',
+      suggestedBin: t.suggestedBin ?? t.suggestedBinBarcode ?? '',
+      skuCode: t.skuCode ?? '',
+    })),
+  });
+  toast.success('Putaway tasks exported to Excel');
 }
 
 export default function PutawayPage() {
@@ -97,6 +100,8 @@ export default function PutawayPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm({ resolver: zodResolver(putawaySchema) });
 
@@ -144,8 +149,8 @@ export default function PutawayPage() {
         title="Putaway"
         description="Assign received items to bin locations across the warehouse."
         actions={
-          <Button size="sm" variant="outline" onClick={() => exportTasksCSV(tasks ?? [])} disabled={!tasks?.length}>
-            <Download className="size-3.5 mr-1.5" /> Export CSV
+          <Button size="sm" variant="outline" onClick={() => exportTasksExcel(tasks ?? [])} disabled={!tasks?.length}>
+            <Download className="size-3.5 mr-1.5" /> Export Excel
           </Button>
         }
       />
@@ -283,13 +288,15 @@ export default function PutawayPage() {
               <div className="space-y-2">
                 <Label htmlFor="itemBarcode">Item barcode</Label>
                 <div className="relative">
-                  <Input
+                  <ScanInput
                     id="itemBarcode"
-                    className="pr-10"
-                    placeholder="Scan item barcode"
-                    {...register('itemBarcode')}
+                    placeholder="Scan item barcode and press Enter…"
+                    onScan={(val) => setValue('itemBarcode', val)}
+                    onChange={(val) => setValue('itemBarcode', val)}
+                    value={watch('itemBarcode') ?? ''}
+                    clearAfterScan={false}
+                    className="font-mono text-sm"
                   />
-                  <Camera className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 </div>
                 {errors.itemBarcode && (
                   <p className="text-xs text-destructive">{errors.itemBarcode.message}</p>
@@ -303,13 +310,15 @@ export default function PutawayPage() {
               <div className="space-y-2">
                 <Label htmlFor="binBarcode">Bin barcode</Label>
                 <div className="relative">
-                  <Input
+                  <ScanInput
                     id="binBarcode"
-                    className="pr-10"
-                    placeholder="Scan destination bin"
-                    {...register('binBarcode')}
+                    placeholder="Scan destination bin and press Enter…"
+                    onScan={(val) => setValue('binBarcode', val)}
+                    onChange={(val) => setValue('binBarcode', val)}
+                    value={watch('binBarcode') ?? ''}
+                    clearAfterScan={false}
+                    className="font-mono text-sm"
                   />
-                  <Camera className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 </div>
                 {errors.binBarcode && (
                   <p className="text-xs text-destructive">{errors.binBarcode.message}</p>

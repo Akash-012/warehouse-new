@@ -3,7 +3,6 @@ package com.warehouse.wms.service;
 import com.warehouse.wms.dto.CreateUserRequest;
 import com.warehouse.wms.dto.UpdateUserRequest;
 import com.warehouse.wms.dto.UserResponse;
-import com.warehouse.wms.entity.Role;
 import com.warehouse.wms.entity.User;
 import com.warehouse.wms.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +20,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RoleService roleService;
 
     public List<UserResponse> listAll() {
         return userRepository.findAll().stream()
@@ -36,18 +36,17 @@ public class UserService {
         if (userRepository.findByUsername(req.getUsername()).isPresent()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already exists");
         }
-        Role role = parseRole(req.getRole());
         User user = new User();
         user.setUsername(req.getUsername());
         user.setPassword(passwordEncoder.encode(req.getPassword()));
-        user.setRole(role);
+        user.setRole(roleService.findByNameOrThrow(req.getRole()));
         return toResponse(userRepository.save(user));
     }
 
     public UserResponse update(Long id, UpdateUserRequest req) {
         User user = findOrThrow(id);
         if (req.getRole() != null && !req.getRole().isBlank()) {
-            user.setRole(parseRole(req.getRole()));
+            user.setRole(roleService.findByNameOrThrow(req.getRole()));
         }
         if (req.getPassword() != null && !req.getPassword().isBlank()) {
             if (req.getPassword().length() < 8) {
@@ -72,18 +71,10 @@ public class UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
     }
 
-    private Role parseRole(String role) {
-        try {
-            return Role.valueOf(role.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid role: " + role);
-        }
-    }
-
     private UserResponse toResponse(User u) {
         var permissions = u.getRole().getPermissions().stream()
                 .map(Enum::name)
                 .collect(Collectors.toList());
-        return new UserResponse(u.getId(), u.getUsername(), u.getRole().name(), permissions);
+        return new UserResponse(u.getId(), u.getUsername(), u.getRole().getName(), permissions);
     }
 }

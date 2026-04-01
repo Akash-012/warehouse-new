@@ -1,57 +1,96 @@
 import { cn } from '@/lib/utils';
-
+/**
+ * Status / inventory-state configurations.
+ * Uses the design-system --state-* CSS tokens for statuses that map to
+ * inventory lifecycle states; falls back to Tailwind colour utilities for
+ * all other statuses.
+ */
 const STATUS_CONFIG = {
-  AVAILABLE:  { dot: 'bg-emerald-500', cls: 'bg-emerald-500/12 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300' },
-  RECEIVED:   { dot: 'bg-sky-500',     cls: 'bg-sky-500/12 text-sky-700 ring-sky-500/20 dark:text-sky-300' },
-  IN_PUTAWAY: { dot: 'bg-amber-500',   cls: 'bg-amber-500/12 text-amber-700 ring-amber-500/20 dark:text-amber-300' },
-  RESERVED:   { dot: 'bg-violet-500',  cls: 'bg-violet-500/12 text-violet-700 ring-violet-500/20 dark:text-violet-300' },
-  PICKED:     { dot: 'bg-fuchsia-500', cls: 'bg-fuchsia-500/12 text-fuchsia-700 ring-fuchsia-500/20 dark:text-fuchsia-300' },
-  PACKED:     { dot: 'bg-teal-500',    cls: 'bg-teal-500/12 text-teal-700 ring-teal-500/20 dark:text-teal-300' },
-  SHIPPED:    { dot: 'bg-cyan-500',    cls: 'bg-cyan-500/12 text-cyan-700 ring-cyan-500/20 dark:text-cyan-300' },
-  FULL:       { dot: 'bg-rose-500',    cls: 'bg-rose-500/12 text-rose-700 ring-rose-500/20 dark:text-rose-300' },
-  BLOCKED:    { dot: 'bg-slate-500',   cls: 'bg-slate-500/12 text-slate-700 ring-slate-500/20 dark:text-slate-300' },
-  OPEN:       { dot: 'bg-blue-500',    cls: 'bg-blue-500/12 text-blue-700 ring-blue-500/20 dark:text-blue-300' },
-  PARTIAL:    { dot: 'bg-orange-500',  cls: 'bg-orange-500/12 text-orange-700 ring-orange-500/20 dark:text-orange-300' },
-  CLOSED:     { dot: 'bg-zinc-500',    cls: 'bg-zinc-500/12 text-zinc-700 ring-zinc-500/20 dark:text-zinc-300' },
-  PENDING:    { dot: 'bg-yellow-500',  cls: 'bg-yellow-500/12 text-yellow-700 ring-yellow-500/20 dark:text-yellow-300' },
-  COMPLETED:  { dot: 'bg-emerald-500', cls: 'bg-emerald-500/12 text-emerald-700 ring-emerald-500/20 dark:text-emerald-300' },
-  CANCELLED:  { dot: 'bg-red-500',     cls: 'bg-red-500/12 text-red-700 ring-red-500/20 dark:text-red-300' },
+    /* ── Inventory lifecycle ───────────────────────────── */
+    RECEIVED: {
+        dot: 'bg-violet-500',
+        cls: 'bg-violet-500/10 text-violet-700 ring-violet-400/30 dark:text-violet-300 dark:bg-violet-500/15',
+    },
+    IN_PUTAWAY: {
+        dot: 'bg-cyan-500',
+        cls: 'bg-cyan-500/10 text-cyan-700 ring-cyan-400/30 dark:text-cyan-300 dark:bg-cyan-500/15',
+        pulse: true,
+    },
+    AVAILABLE: {
+        dot: 'bg-emerald-500',
+        cls: 'bg-emerald-500/10 text-emerald-700 ring-emerald-400/30 dark:text-emerald-300 dark:bg-emerald-500/15',
+    },
+    RESERVED: {
+        dot: 'bg-amber-500',
+        cls: 'bg-amber-500/10 text-amber-700 ring-amber-400/30 dark:text-amber-300 dark:bg-amber-500/15',
+        pulse: true,
+    },
+    PICKED: {
+        dot: 'bg-blue-500',
+        cls: 'bg-blue-500/10 text-blue-700 ring-blue-400/30 dark:text-blue-300 dark:bg-blue-500/15',
+        pulse: true,
+    },
+    PACKED: {
+        dot: 'bg-violet-500',
+        cls: 'bg-violet-500/10 text-violet-700 ring-violet-400/30 dark:text-violet-300 dark:bg-violet-500/15',
+    },
+    SHIPPED: {
+        dot: 'bg-slate-400',
+        cls: 'bg-slate-500/10 text-slate-600 ring-slate-400/30 dark:text-slate-300 dark:bg-slate-500/15',
+    },
+    /* ── Order / PO states ─────────────────────────────── */
+    PENDING: {
+        dot: 'bg-yellow-500',
+        cls: 'bg-yellow-500/10 text-yellow-700 ring-yellow-400/30 dark:text-yellow-300 dark:bg-yellow-500/15',
+        pulse: true,
+    },
+    OPEN: {
+        dot: 'bg-blue-500',
+        cls: 'bg-blue-500/10 text-blue-700 ring-blue-400/30 dark:text-blue-300 dark:bg-blue-500/15',
+        pulse: true,
+    },
+    PARTIAL: {
+        dot: 'bg-orange-500',
+        cls: 'bg-orange-500/10 text-orange-700 ring-orange-400/30 dark:text-orange-300 dark:bg-orange-500/15',
+    },
+    COMPLETED: {
+        dot: 'bg-emerald-500',
+        cls: 'bg-emerald-500/10 text-emerald-700 ring-emerald-400/30 dark:text-emerald-300 dark:bg-emerald-500/15',
+    },
+    CLOSED: {
+        dot: 'bg-zinc-400',
+        cls: 'bg-zinc-500/10 text-zinc-600 ring-zinc-400/30 dark:text-zinc-300 dark:bg-zinc-500/15',
+    },
+    CANCELLED: {
+        dot: 'bg-red-500',
+        cls: 'bg-red-500/10 text-red-700 ring-red-400/30 dark:text-red-300 dark:bg-red-500/15',
+    },
+    /* ── Bin states ────────────────────────────────────── */
+    FULL: {
+        dot: 'bg-rose-500',
+        cls: 'bg-rose-500/10 text-rose-700 ring-rose-400/30 dark:text-rose-300 dark:bg-rose-500/15',
+    },
+    BLOCKED: {
+        dot: 'bg-slate-500',
+        cls: 'bg-slate-500/10 text-slate-600 ring-slate-400/30 dark:text-slate-300 dark:bg-slate-500/15',
+    },
 };
-
-const PULSE_STATUSES = new Set(['IN_PUTAWAY', 'PENDING', 'OPEN', 'RESERVED', 'PICKED']);
-
 function formatStatus(status) {
-  return String(status || '')
-    .toLowerCase()
-    .split('_')
-    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
-    .join(' ');
+    return status
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase());
 }
-
-export default function StatusBadge({ status, className, showDot = true }) {
-  const key = String(status || '').toUpperCase();
-  const config = STATUS_CONFIG[key];
-  const pulse = PULSE_STATUSES.has(key);
-
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset whitespace-nowrap',
-        config?.cls || 'bg-muted text-muted-foreground ring-border',
-        className
-      )}
-    >
-      {showDot && (
-        <span
-          className={cn(
-            'inline-block size-1.5 rounded-full shrink-0',
-            config?.dot || 'bg-muted-foreground',
-            pulse && 'animate-pulse'
-          )}
-        />
-      )}
-      {formatStatus(status || 'Unknown')}
-    </span>
-  );
+/**
+ * Pill badge for inventory, order, and bin lifecycle states.
+ * Active states (IN_PUTAWAY, RESERVED, PICKED, PENDING, OPEN) animate
+ * the indicator dot with a pulse.
+ */
+export default function StatusBadge({ status, showDot = true, className, }) {
+    const key = String(status ?? '').toUpperCase();
+    const config = STATUS_CONFIG[key];
+    return (<span className={cn('inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[0.7rem] font-semibold ring-1 ring-inset whitespace-nowrap tracking-wide', config?.cls ?? 'bg-muted text-muted-foreground ring-border', className)}>
+      {showDot && (<span className={cn('inline-block size-[5px] shrink-0 rounded-full', config?.dot ?? 'bg-muted-foreground', config?.pulse && 'animate-pulse')}/>)}
+      {formatStatus(status ?? 'Unknown')}
+    </span>);
 }
-

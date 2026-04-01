@@ -13,8 +13,8 @@ import StatusBadge from '@/components/StatusBadge';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
-} from '@/components/ui/dialog';
+  SheetFooter,
+} from '@/components/ui/sheet';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
@@ -25,7 +25,9 @@ import {
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
+import SlideOverForm from '@/components/ui/SlideOverForm';
 import api from '@/lib/api';
+import { exportWmsWorkbook } from '@/lib/exportExcel';
 import { toast } from 'sonner';
 
 const receiveSchema = z.object({
@@ -37,20 +39,27 @@ const receiveSchema = z.object({
   })).min(1, 'At least one line is required'),
 });
 
-function exportPOs(pos) {
-  const BOM = '\uFEFF';
-  const headers = ['PO Number', 'Supplier', 'Status', 'Lines', 'Created At'];
-  const rows = pos.map((p) => [
-    p.poNumber, p.supplier ?? '', p.status ?? '', p.lineCount ?? p.lines?.length ?? '',
-    p.createdAt ? format(new Date(p.createdAt), 'dd MMM yyyy') : '',
-  ]);
-  const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-  const blob = new Blob([BOM + csv], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `purchase_orders_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-  a.click();
-  toast.success('Purchase orders exported');
+async function exportPOs(pos) {
+  await exportWmsWorkbook({
+    fileName: `purchase_orders_${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
+    sheetName: 'Purchase Orders',
+    title: 'WMS Purchase Orders Export',
+    columns: [
+      { header: 'PO Number', key: 'poNumber', width: 16 },
+      { header: 'Supplier', key: 'supplier', width: 24 },
+      { header: 'Status', key: 'status', width: 14, align: 'center' },
+      { header: 'Line Count', key: 'lineCount', width: 14, align: 'right' },
+      { header: 'Created At', key: 'createdAt', width: 18, align: 'center' },
+    ],
+    rows: pos.map((p) => ({
+      poNumber: p.poNumber,
+      supplier: p.supplier ?? '',
+      status: p.status ?? '',
+      lineCount: p.lineCount ?? p.lines?.length ?? 0,
+      createdAt: p.createdAt ? format(new Date(p.createdAt), 'dd MMM yyyy') : '',
+    })),
+  });
+  toast.success('Purchase orders exported to Excel');
 }
 
 export default function InboundPage() {
@@ -112,9 +121,9 @@ export default function InboundPage() {
         title="Inbound"
         description="Manage purchase orders and receive goods into the warehouse."
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => exportPOs(purchaseOrders ?? [])}>
-              <Download className="size-3.5 mr-1.5" /> Export CSV
+              <Download className="size-3.5 mr-1.5" /> Export Excel
             </Button>
             <Button size="sm" onClick={() => setOpen(true)}>
               <Plus className="size-3.5 mr-1.5" /> Receive PO
@@ -123,13 +132,13 @@ export default function InboundPage() {
         }
       />
 
-      {/* Receive PO Dialog */}
-      <Dialog open={open} onOpenChange={(v) => { setOpen(v); if (!v) { setGrnResult(null); reset(); } }}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Receive Purchase Order</DialogTitle>
-            <DialogDescription>Enter the PO ID and items being received. A GRN will be created.</DialogDescription>
-          </DialogHeader>
+      {/* Receive PO Sheet */}
+      <SlideOverForm
+        open={open}
+        onOpenChange={(v) => { setOpen(v); if (!v) { setGrnResult(null); reset(); } }}
+        title="Receive Purchase Order"
+        description="Enter the PO ID and items being received. A GRN will be created."
+      >
                 {grnResult ? (
                   <div className="flex flex-col items-center gap-4 py-6 text-center">
                     <div className="size-14 rounded-full bg-emerald-500/10 flex items-center justify-center">
@@ -184,17 +193,16 @@ export default function InboundPage() {
                         </div>
                       ))}
                     </div>
-                    <DialogFooter>
+                      <SheetFooter>
                       <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                       <Button type="submit" disabled={receiveMutation.isPending}>
                         {receiveMutation.isPending && <Loader2 className="size-3.5 mr-2 animate-spin" />}
                         Receive Goods
                       </Button>
-                    </DialogFooter>
+                      </SheetFooter>
                   </form>
                 )}
-        </DialogContent>
-      </Dialog>
+      </SlideOverForm>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard title="Total POs"     value={stats.total}    icon={Package} kpiVariant="blue"   accentClass="text-blue-500"   iconBg="bg-blue-500/10" />
         <StatCard title="Pending"       value={stats.pending}  icon={Package} kpiVariant="amber"  accentClass="text-amber-500"  iconBg="bg-amber-500/10" />

@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 @Data
 public class BinResponse {
     private Long id;
+    private Long rackId;
     private String barcode;
     private BigDecimal lengthCm;
     private BigDecimal widthCm;

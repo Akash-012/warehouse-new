@@ -3,10 +3,8 @@ import { dirname } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
-const backendHost = new URL(BACKEND_URL).hostname;
-const backendPort = new URL(BACKEND_URL).port || '';
-const backendProtocol = new URL(BACKEND_URL).protocol.replace(':', '');
+const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL?.trim()?.replace(/\/$/, '');
+const parsedBackendUrl = BACKEND_URL ? new URL(BACKEND_URL) : null;
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -14,6 +12,9 @@ const nextConfig = {
     root: __dirname,
   },
   async rewrites() {
+    if (!BACKEND_URL) {
+      return [];
+    }
     return [
       {
         source: '/api/:path*',
@@ -22,13 +23,15 @@ const nextConfig = {
     ];
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: backendProtocol,
-        hostname: backendHost,
-        port: backendPort,
-      },
-    ],
+    remotePatterns: parsedBackendUrl
+      ? [
+          {
+            protocol: parsedBackendUrl.protocol.replace(':', ''),
+            hostname: parsedBackendUrl.hostname,
+            port: parsedBackendUrl.port || '',
+          },
+        ]
+      : [],
   },
 };
 

@@ -81,9 +81,17 @@ function ToggleRow({ label, hint, checked, onCheckedChange }) {
 }
 
 /* ══════════════════════════════════════════════════════ */
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import { P } from '@/lib/permissions';
+
 export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
+  const { can } = usePermissions();
+  const configuredApiBase = process.env.NEXT_PUBLIC_API_URL?.trim()?.replace(/\/$/, '');
+  const resolvedApiBase = configuredApiBase || (typeof window !== 'undefined' ? window.location.origin : '');
+  const apiBaseUrl = resolvedApiBase ? `${resolvedApiBase}/api` : '/api';
+  const swaggerUrl = resolvedApiBase ? `${resolvedApiBase}/swagger-ui.html` : '/swagger-ui.html';
 
   /* ── Notification prefs (local state / localStorage) ── */
   const [notifPickAlert,    setNotifPickAlert]    = useState(true);
@@ -143,6 +151,8 @@ export default function SettingsPage() {
     queryKey: ['warehouses'],
     queryFn: () => api.get('/master/warehouses').then((r) => r.data),
     staleTime: 60_000,
+    enabled: can(P.MASTER_VIEW),
+    retry: false,
   });
 
   const primaryWarehouse = warehouses?.[0];
@@ -283,7 +293,14 @@ export default function SettingsPage() {
 
         {/* ── Warehouse Tab ────────────────────────────────── */}
         <TabsContent value="warehouse" className="flex flex-col gap-4 sm:gap-6 mt-0">
-          <Section icon={Warehouse} title="Primary Warehouse" description="Configure your main warehouse location">
+          {!can(P.MASTER_VIEW) ? (
+            <div className="glass-card rounded-2xl p-10 flex flex-col items-center gap-3 text-muted-foreground">
+              <Shield className="size-10 opacity-30" />
+              <p className="text-sm font-medium">Warehouse configuration requires Master Data access.</p>
+              <p className="text-xs">Contact your administrator to request the MASTER_VIEW permission.</p>
+            </div>
+          ) : (
+            <Section icon={Warehouse} title="Primary Warehouse" description="Configure your main warehouse location">
             {whLoading ? (
               <div className="space-y-3">
                 {[1, 2].map((i) => <Skeleton key={i} className="h-9 w-full" />)}
@@ -331,6 +348,7 @@ export default function SettingsPage() {
               </div>
             )}
           </Section>
+          )}
 
           <Section icon={Database} title="Data & Storage" description="Database and migration information">
             <div className="flex flex-col gap-2 text-xs sm:text-sm">
@@ -441,7 +459,7 @@ export default function SettingsPage() {
             <div className="flex flex-col gap-2 text-xs sm:text-sm">
               <div className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/50 transition-colors">
                 <span className="text-muted-foreground">API Base URL</span>
-                <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded truncate ml-2">http://localhost:8080/api</span>
+                <span className="font-mono text-xs bg-muted px-2 py-0.5 rounded truncate ml-2">{apiBaseUrl}</span>
               </div>
               <Separator />
               <div className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/50 transition-colors">
@@ -471,7 +489,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between py-2 px-2 rounded hover:bg-muted/50 transition-colors">
                 <span className="text-muted-foreground">API Docs</span>
                 <a
-                  href="http://localhost:8080/swagger-ui.html"
+                  href={swaggerUrl}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-mono text-xs text-primary hover:underline"

@@ -65,17 +65,17 @@
 
   /* ── System tokens (oklch for opacity-modifier compat) ── */
   --background:           oklch(0.979 0.003 264);
-  --foreground:           oklch(0.157 0.016 264);
+  --foreground:           oklch(0 0 0);
   --card:                 oklch(1 0 0);
-  --card-foreground:      oklch(0.157 0.016 264);
+  --card-foreground:      oklch(0 0 0);
   --popover:              oklch(1 0 0);
-  --popover-foreground:   oklch(0.157 0.016 264);
+  --popover-foreground:   oklch(0 0 0);
   --primary:              oklch(0.488 0.243 264);   /* #1B4FD8 */
   --primary-foreground:   oklch(0.98 0 0);
   --secondary:            oklch(0.94 0.02 264);
   --secondary-foreground: oklch(0.36 0.08 264);
   --muted:                oklch(0.96 0.003 264);
-  --muted-foreground:     oklch(0.52 0.016 264);
+  --muted-foreground:     oklch(0.28 0.01 264);
   --accent:               oklch(0.94 0.02 264);
   --accent-foreground:    oklch(0.36 0.1 264);
   --destructive:          oklch(0.583 0.236 27);
@@ -131,17 +131,17 @@
 /* ── Dark mode overrides ────────────────────────────── */
 .dark {
   --background:           oklch(0.135 0.014 264);
-  --foreground:           oklch(0.96  0.006 264);
+  --foreground:           oklch(1 0 0);
   --card:                 oklch(0.174 0.016 264);
-  --card-foreground:      oklch(0.96  0.006 264);
+  --card-foreground:      oklch(1 0 0);
   --popover:              oklch(0.174 0.016 264);
-  --popover-foreground:   oklch(0.96  0.006 264);
+  --popover-foreground:   oklch(1 0 0);
   --primary:              oklch(0.62  0.20  264);
   --primary-foreground:   oklch(0.14  0.014 264);
   --secondary:            oklch(0.22  0.016 264);
   --secondary-foreground: oklch(0.96  0.006 264);
   --muted:                oklch(0.22  0.016 264);
-  --muted-foreground:     oklch(0.68  0.012 264);
+  --muted-foreground:     oklch(0.9 0 0);
   --accent:               oklch(0.26  0.026 264);
   --accent-foreground:    oklch(0.94  0.01  264);
   --destructive:          oklch(0.65  0.21  27);

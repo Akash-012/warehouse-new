@@ -1,19 +1,31 @@
 'use client';
 
+import { useEffect, useMemo, useState } from 'react';
+
 /**
  * Hook to read the current user's permissions from localStorage.
  * Populated at login from the AuthResponse.
  */
 export function usePermissions() {
-  if (typeof window === 'undefined') {
-    return { can: () => false, canAny: () => false, role: null, username: null, permissions: [] };
-  }
+  const [permissions, setPermissions] = useState([]);
+  const [role, setRole] = useState(null);
+  const [username, setUsername] = useState(null);
+  const [loaded, setLoaded] = useState(false);
 
-  const permissions = JSON.parse(localStorage.getItem('wms_permissions') || '[]');
-  const role = localStorage.getItem('wms_role') || null;
-  const username = localStorage.getItem('wms_username') || null;
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const parsed = JSON.parse(localStorage.getItem('wms_permissions') || '[]');
+      setPermissions(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setPermissions([]);
+    }
+    setRole(localStorage.getItem('wms_role') || null);
+    setUsername(localStorage.getItem('wms_username') || null);
+    setLoaded(true);
+  }, []);
 
-  return {
+  return useMemo(() => ({
     /** True if the user has the given permission string */
     can: (permission) => permissions.includes(permission),
     /** True if the user has ANY of the given permissions */
@@ -21,5 +33,6 @@ export function usePermissions() {
     role,
     username,
     permissions,
-  };
+    loaded,
+  }), [loaded, permissions, role, username]);
 }

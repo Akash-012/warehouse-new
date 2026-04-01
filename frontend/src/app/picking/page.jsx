@@ -9,10 +9,12 @@ import StatCard from '@/components/StatCard';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ScanInput } from '@/components/ui/ScanInput';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import api from '@/lib/api';
+import { exportWmsWorkbook } from '@/lib/exportExcel';
 import {
   Table,
   TableBody,
@@ -34,26 +36,27 @@ import {
   Search,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 
-function exportPicksCSV(tasks) {
-  const BOM = '\uFEFF';
-  const header = 'SKU,Bin,Qty Required,Status\n';
-  const rows = tasks
-    .map((t) =>
-      [
-        t.skuCode ?? t.sku ?? '',
-        t.binBarcode ?? t.bin ?? '',
-        t.requiredQty ?? t.quantity ?? 1,
-        t.status ?? 'PENDING',
-      ].join(','),
-    )
-    .join('\n');
-  const blob = new Blob([BOM + header + rows], { type: 'text/csv;charset=utf-8' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `pick_tasks_${new Date().toISOString().slice(0, 10)}.csv`;
-  a.click();
-  toast.success('Pick tasks exported');
+async function exportPicksExcel(tasks) {
+  await exportWmsWorkbook({
+    fileName: `pick_tasks_${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
+    sheetName: 'Pick Tasks',
+    title: 'WMS Picking Queue Export',
+    columns: [
+      { header: 'SKU', key: 'skuCode', width: 18 },
+      { header: 'Bin', key: 'binBarcode', width: 16 },
+      { header: 'Qty Required', key: 'requiredQty', width: 14, align: 'right' },
+      { header: 'Status', key: 'status', width: 14, align: 'center' },
+    ],
+    rows: tasks.map((t) => ({
+      skuCode: t.skuCode ?? t.sku ?? '',
+      binBarcode: t.binBarcode ?? t.bin ?? '',
+      requiredQty: t.requiredQty ?? t.quantity ?? 1,
+      status: t.status ?? 'PENDING',
+    })),
+  });
+  toast.success('Pick tasks exported to Excel');
 }
 
 export default function PickingPage() {
@@ -97,14 +100,6 @@ export default function PickingPage() {
     if (orderId) startSession(trolley || null, rack || null, orderId);
   };
 
-  const handleScan = (e) => {
-    e.preventDefault();
-    const barcode = e.target.elements.itemBarcode.value.trim();
-    if (barcode) {
-      scanItem(barcode);
-      e.target.reset();
-    }
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -112,8 +107,8 @@ export default function PickingPage() {
         title="Picking"
         description="Manage pick tasks and run scan sessions on the warehouse floor."
         actions={
-          <Button size="sm" variant="outline" onClick={() => exportPicksCSV(pendingTasks ?? [])} disabled={!pendingTasks?.length}>
-            <Download className="size-3.5 mr-1.5" /> Export CSV
+          <Button size="sm" variant="outline" onClick={() => exportPicksExcel(pendingTasks ?? [])} disabled={!pendingTasks?.length}>
+            <Download className="size-3.5 mr-1.5" /> Export Excel
           </Button>
         }
       />
@@ -281,24 +276,22 @@ export default function PickingPage() {
                   onChange={(e) => setOrderId(e.target.value)}
                 />
               </div>
-              <div className="relative">
-                <Package className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-9 font-mono text-sm"
-                  placeholder="Trolley barcode (optional)"
-                  value={trolley}
-                  onChange={(e) => setTrolley(e.target.value)}
-                />
-              </div>
-              <div className="relative">
-                <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                <Input
-                  className="pl-9 font-mono text-sm"
-                  placeholder="Rack compartment barcode (optional)"
-                  value={rack}
-                  onChange={(e) => setRack(e.target.value)}
-                />
-              </div>
+              <ScanInput
+                placeholder="Trolley barcode (optional)"
+                value={trolley}
+                onChange={setTrolley}
+                onScan={setTrolley}
+                className="font-mono text-sm"
+                clearAfterScan={false}
+              />
+              <ScanInput
+                placeholder="Rack compartment barcode (optional)"
+                value={rack}
+                onChange={setRack}
+                onScan={setRack}
+                className="font-mono text-sm"
+                clearAfterScan={false}
+              />
               <Button
                 type="submit"
                 disabled={isLoading || !orderId}
@@ -318,20 +311,13 @@ export default function PickingPage() {
               </div>
               <Separator />
 
-              <form onSubmit={handleScan} className="flex gap-2">
-                <div className="relative flex-1">
-                  <ScanLine className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
-                  <Input
-                    name="itemBarcode"
-                    className="pl-9 font-mono text-sm"
-                    placeholder="Scan item barcode"
-                    autoFocus
-                  />
-                </div>
-                <Button type="submit" disabled={isLoading}>
-                  Scan
-                </Button>
-              </form>
+              <ScanInput
+                onScan={(val) => { if (val) scanItem(val); }}
+                placeholder="Scan item barcode and press Enter…"
+                autoFocus
+                disabled={isLoading}
+                className="font-mono text-sm"
+              />
 
               <ul className="thin-scrollbar overflow-y-auto max-h-72 space-y-1.5">
                 {expectedItems.map((item) => {

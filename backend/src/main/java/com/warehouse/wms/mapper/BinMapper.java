@@ -20,6 +20,7 @@ public interface BinMapper {
     Bin toEntity(BinCreateRequest request);
 
     @Mapping(target = "status", expression = "java(bin.getStatus().name())")
+    @Mapping(target = "rackId", expression = "java(bin.getRack() != null ? bin.getRack().getId() : null)")
     @Mapping(target = "utilizationPct", expression = "java(calculateUtilization(bin))")
     BinResponse toResponse(Bin bin);
 

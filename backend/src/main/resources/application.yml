@@ -1,11 +1,19 @@
 spring:
+  config:
+    import: optional:file:.env[.properties]
   threads:
     virtual:
       enabled: true
+  ai:
+    ollama:
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
+      chat:
+        options:
+          model: ${SPRING_AI_OLLAMA_MODEL:llama3.1:8b}
   datasource:
-    url: ${DB_URL:jdbc:mysql://localhost:3306/wms_db?createDatabaseIfNotExist=true}
-    username: ${DB_USERNAME:root}
-    password: ${DB_PASSWORD:}
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
       pool-name: HikariCP-wms
@@ -22,14 +30,14 @@ spring:
     enabled: false
 
 jwt:
-  secret: ${JWT_SECRET:a2c4e6f8h1k3m5n7p9r2s4v6y8z1b3d5g7j9l1o3q5w7e9z1x3c5v7b9m2k4}
+  secret: ${JWT_SECRET}
   expiration-ms: ${JWT_EXPIRATION_MS:86400000}
 
 server:
   port: ${SERVER_PORT:8080}
 
 cors:
-  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:3001}
+  allowed-origins: ${CORS_ALLOWED_ORIGINS}
 
 management:
   endpoints:
@@ -39,3 +47,9 @@ management:
   endpoint:
     health:
       show-details: always
+
+app:
+  ai:
+    # Keep false when you do not want Spring AI.
+    # Set APP_AI_ENABLED=true to enable /api/ai/chat.
+    enabled: ${APP_AI_ENABLED:false}

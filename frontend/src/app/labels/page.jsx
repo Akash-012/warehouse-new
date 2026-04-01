@@ -18,6 +18,8 @@ import {
 import { toast } from 'sonner';
 import { Tag, ScanLine, Plus, X, Printer, ClipboardList, ShoppingCart } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
+import { usePermissions } from '@/lib/hooks/usePermissions';
+import { P } from '@/lib/permissions';
 
 const TYPE_OPTIONS = ['Item', 'Bin', 'Trolley'];
 
@@ -25,17 +27,22 @@ export default function LabelsPage() {
   const [barcodeInput, setBarcodeInput] = useState('');
   const [labelType, setLabelType] = useState('Item');
   const [barcodes, setBarcodes] = useState([]);
+  const { can } = usePermissions();
 
   const { data: purchaseOrders } = useQuery({
     queryKey: ['purchase-orders-list'],
     queryFn: () => api.get('/purchase-orders').then((r) => r.data),
     staleTime: 60_000,
+    enabled: can(P.INBOUND_VIEW),
+    retry: false,
   });
 
   const { data: orders } = useQuery({
     queryKey: ['orders-list'],
     queryFn: () => api.get('/orders').then((r) => r.data),
     staleTime: 60_000,
+    enabled: can(P.ORDERS_VIEW),
+    retry: false,
   });
 
   const addBarcode = (e) => {

@@ -214,11 +214,25 @@ CORS_ALLOWED_ORIGINS=http://localhost:3000
 #### 4.2 — Set environment variables in your shell (Windows PowerShell)
 
 ```powershell
-$env:DB_USERNAME   = "root"
-$env:DB_PASSWORD   = "your_password"
-$env:JWT_SECRET    = "your_jwt_secret_minimum_64_chars"
-$env:SERVER_PORT   = "8080"
-$env:CORS_ALLOWED_ORIGINS = "http://localhost:3000"
+# Load all values from backend/.env into current process
+Set-Location D:\path\to\warehouse-new\backend
+Get-Content .env |
+  Where-Object { $_ -and -not $_.StartsWith('#') } |
+  ForEach-Object {
+    $parts = $_ -split '=',2
+    if ($parts.Length -eq 2) {
+      [Environment]::SetEnvironmentVariable($parts[0], $parts[1], 'Process')
+    }
+  }
+
+# Ensure Java 21 is used
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot"
+
+# Keep AI off for local dev and avoid startup key errors
+$env:APP_AI_ENABLED = "false"
+if (-not $env:SPRING_AI_OPENAI_API_KEY) {
+  $env:SPRING_AI_OPENAI_API_KEY = "disabled-local-key"
+}
 ```
 
 **macOS / Linux (bash/zsh):**
@@ -234,11 +248,13 @@ export CORS_ALLOWED_ORIGINS=http://localhost:3000
 
 **Windows PowerShell (with JAVA_HOME set):**
 ```powershell
-$env:JAVA_HOME = "C:\Path\To\JDK21"
-$env:PATH      = "$env:JAVA_HOME\bin;$env:PATH"
+# From repo root (recommended):
+taskkill /F /IM java.exe /T > $null 2>&1
+& 'D:\path\to\warehouse-new\tools\apache-maven-3.9.6\bin\mvn.cmd' -f 'D:\path\to\warehouse-new\backend\pom.xml' spring-boot:run
 
-cd D:\path\to\warehouse-new\backend
-mvn spring-boot:run
+# If mvn is available in PATH, you can also run:
+# Set-Location D:\path\to\warehouse-new\backend
+# mvn spring-boot:run
 ```
 
 **macOS / Linux:**
@@ -288,6 +304,7 @@ npm install
 #### 5.3 — Run the frontend
 
 ```bash
+cd frontend
 npm run dev
 ```
 
@@ -305,11 +322,20 @@ Open **two terminal windows** (or two VS Code terminal panels):
 
 **Terminal 1 — Backend:**
 ```powershell
-# Windows PowerShell
-$env:JAVA_HOME = "C:\Path\To\JDK21"
-$env:PATH = "$env:JAVA_HOME\bin;$env:PATH"
-cd D:\path\to\warehouse-new\backend
-mvn spring-boot:run
+# Windows PowerShell (repo root)
+Set-Location D:\path\to\warehouse-new\backend
+Get-Content .env |
+  Where-Object { $_ -and -not $_.StartsWith('#') } |
+  ForEach-Object {
+    $parts = $_ -split '=',2
+    if ($parts.Length -eq 2) {
+      [Environment]::SetEnvironmentVariable($parts[0], $parts[1], 'Process')
+    }
+  }
+$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot"
+$env:APP_AI_ENABLED = "false"
+if (-not $env:SPRING_AI_OPENAI_API_KEY) { $env:SPRING_AI_OPENAI_API_KEY = "disabled-local-key" }
+& 'D:\path\to\warehouse-new\tools\apache-maven-3.9.6\bin\mvn.cmd' spring-boot:run
 ```
 
 **Terminal 2 — Frontend:**
@@ -508,6 +534,9 @@ And set `NEXT_PUBLIC_API_URL=https://yourbackend.com` in the frontend `.env.prod
 |---|---|
 | `Port 8080 already in use` | Kill the existing Java process or set `SERVER_PORT=8081` |
 | `Port 3000 already in use` | Run `npm run dev -- -p 3001` or kill existing Node process |
+| `mvn is not recognized` | Use repo Maven directly: `D:\...\tools\apache-maven-3.9.6\bin\mvn.cmd` |
+| `JAVA_HOME environment variable is not defined correctly` | Set Java 21 path: `C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot` |
+| `OpenAI API key must be set` during backend start | Set `APP_AI_ENABLED=false` and `SPRING_AI_OPENAI_API_KEY=disabled-local-key` in process/env |
 | `Invalid username or password` | Backend may have stale role values in DB. Restart the Spring Boot app — DataInitializer will fix them automatically |
 | `403 Forbidden on login` | Ensure you are **not** running an old version of the backend. The fix (catching `BadCredentialsException`) must be present |
 | `CORS error in browser` | Verify `CORS_ALLOWED_ORIGINS` includes the exact origin from your browser URL bar |
