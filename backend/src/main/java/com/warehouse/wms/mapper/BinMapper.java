@@ -12,7 +12,8 @@ import java.math.RoundingMode;
 @Mapper(componentModel = "spring")
 public interface BinMapper {
 
-    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "id", ignore = true) 
+    
     @Mapping(target = "rack", ignore = true)
     @Mapping(target = "volumeCm3", ignore = true)
     @Mapping(target = "occupiedVolumeCm3", constant = "0")

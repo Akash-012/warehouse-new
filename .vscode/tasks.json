@@ -8,7 +8,7 @@
 			"options": {
 				"cwd": "${workspaceFolder}/backend",
 				"env": {
-					"JAVA_HOME": "C:/Program Files/Microsoft/jdk-21.0.10.7-hotspot",
+					"JAVA_HOME": "C:/Program Files/Microsoft/jdk-17.0.18.8-hotspot",
 					"MAVEN_OPTS": "-Xms256m -Xmx512m"
 				}
 			},
@@ -22,7 +22,7 @@
 			"options": {
 				"cwd": "${workspaceFolder}/backend",
 				"env": {
-					"JAVA_HOME": "C:/Program Files/Microsoft/jdk-21.0.10.7-hotspot"
+					"JAVA_HOME": "C:/Program Files/Microsoft/jdk-17.0.18.8-hotspot"
 				}
 			},
 			"group": "build",

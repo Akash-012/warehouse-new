@@ -1,7 +1,7 @@
 {
     "java.compile.nullAnalysis.mode": "automatic",
     "java.project.referencedLibraries": ["backend/target/**/*.jar"],
-    "java.jdt.ls.java.home": "C:\\Program Files\\Microsoft\\jdk-21.0.10.7-hotspot",
+    "java.jdt.ls.java.home": "C:\\Program Files\\Microsoft\\jdk-17.0.18.8-hotspot",
     "maven.executable.path": "D:\\Ak01\\warehouse-new\\tools\\apache-maven-3.9.6\\bin\\mvn.cmd",
     "maven.terminal.useJavaHome": true,
     "java.configuration.updateBuildConfiguration": "automatic"

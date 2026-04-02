@@ -3,7 +3,7 @@ spring:
     import: optional:file:.env[.properties]
   threads:
     virtual:
-      enabled: true
+      enabled: ${APP_VIRTUAL_THREADS_ENABLED:false}
   ai:
     ollama:
       base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}

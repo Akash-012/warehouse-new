@@ -45,13 +45,13 @@ A full-stack Warehouse Management System built with **Spring Boot 3.3** (backend
 
 Install the following on the new machine **before** doing anything else.
 
-### 1. Java 21 (JDK)
+### 1. Java 17 (JDK)
 
-- Download: https://adoptium.net/temurin/releases/?version=21
+- Download: https://adoptium.net/temurin/releases/?version=17
 - After install, verify:
   ```bash
   java -version
-  # openjdk version "21.x.x" ...
+  # openjdk version "17.x.x" ...
   ```
 - Set `JAVA_HOME` environment variable to the JDK folder.
 
@@ -225,8 +225,8 @@ Get-Content .env |
     }
   }
 
-# Ensure Java 21 is used
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot"
+# Ensure Java 17 is used
+$env:JAVA_HOME = "C:\\path\\to\\jdk-17"
 
 # Keep AI off for local dev and avoid startup key errors
 $env:APP_AI_ENABLED = "false"
@@ -332,7 +332,7 @@ Get-Content .env |
       [Environment]::SetEnvironmentVariable($parts[0], $parts[1], 'Process')
     }
   }
-$env:JAVA_HOME = "C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot"
+$env:JAVA_HOME = "C:\\path\\to\\jdk-17"
 $env:APP_AI_ENABLED = "false"
 if (-not $env:SPRING_AI_OPENAI_API_KEY) { $env:SPRING_AI_OPENAI_API_KEY = "disabled-local-key" }
 & 'D:\path\to\warehouse-new\tools\apache-maven-3.9.6\bin\mvn.cmd' spring-boot:run
@@ -535,7 +535,7 @@ And set `NEXT_PUBLIC_API_URL=https://yourbackend.com` in the frontend `.env.prod
 | `Port 8080 already in use` | Kill the existing Java process or set `SERVER_PORT=8081` |
 | `Port 3000 already in use` | Run `npm run dev -- -p 3001` or kill existing Node process |
 | `mvn is not recognized` | Use repo Maven directly: `D:\...\tools\apache-maven-3.9.6\bin\mvn.cmd` |
-| `JAVA_HOME environment variable is not defined correctly` | Set Java 21 path: `C:\Program Files\Microsoft\jdk-21.0.10.7-hotspot` |
+| `JAVA_HOME environment variable is not defined correctly` | Set Java 17 path, for example: `C:\path\to\jdk-17` |
 | `OpenAI API key must be set` during backend start | Set `APP_AI_ENABLED=false` and `SPRING_AI_OPENAI_API_KEY=disabled-local-key` in process/env |
 | `Invalid username or password` | Backend may have stale role values in DB. Restart the Spring Boot app — DataInitializer will fix them automatically |
 | `403 Forbidden on login` | Ensure you are **not** running an old version of the backend. The fix (catching `BadCredentialsException`) must be present |
