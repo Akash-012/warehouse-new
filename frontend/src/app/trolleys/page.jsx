@@ -78,10 +78,10 @@ export default function TrolleysPage() {
         })
         .then((r) => r.data),
     onSuccess: (data) => {
-      toast.success(`Trolley ${data.barcode ?? data.trolleyBarcode} created`);
+      toast.success(`Trolley ${data.trolleyIdentifier} created`);
       resetCreate();
     },
-    onError: () => toast.error('Failed to create trolley'),
+    onError: (e) => toast.error(e?.response?.data?.detail ?? 'Failed to create trolley'),
   });
 
   const assignMutation = useMutation({
@@ -90,7 +90,7 @@ export default function TrolleysPage() {
       toast.success('Compartment assigned to order');
       resetAssign();
     },
-    onError: () => toast.error('Failed to assign compartment'),
+    onError: (e) => toast.error(e?.response?.data?.detail ?? 'Failed to assign compartment'),
   });
 
   const lookupMutation = useMutation({
@@ -138,7 +138,7 @@ export default function TrolleysPage() {
               <TableBody>
                 {trolleyList.map((t) => (
                   <TableRow key={t.id ?? t.barcode} className="table-row-hover">
-                    <TableCell className="font-mono text-sm font-medium text-primary">{t.barcode ?? t.trolleyBarcode}</TableCell>
+                    <TableCell className="font-mono text-sm font-medium text-primary">{t.trolleyIdentifier}</TableCell>
                     <TableCell className="text-sm">{t.compartmentCount ?? t.compartments?.length ?? '—'}</TableCell>
                     <TableCell><StatusBadge status={t.status ?? 'IDLE'} /></TableCell>
                   </TableRow>
@@ -177,11 +177,12 @@ export default function TrolleysPage() {
 
             <div className="flex flex-col gap-2">
               <Label>Compartment Barcodes</Label>
+              <p className="text-xs text-muted-foreground">Use existing compartment codes (example: COMP-A1R1-01)</p>
               {fields.map((field, idx) => (
                 <div key={field.id} className="flex gap-2">
                   <Input
                     {...regCreate(`compartmentBarcodes.${idx}.value`)}
-                    placeholder={`Compartment ${idx + 1}`}
+                    placeholder={`COMP-... (e.g. COMP-A1R1-0${idx + 1})`}
                     className="font-mono flex-1"
                   />
                   {fields.length > 1 && (
@@ -301,7 +302,7 @@ export default function TrolleysPage() {
                     {compartmentContents.map((c) => (
                       <TableRow key={c.compartmentBarcode} className="table-row-hover">
                         <TableCell className="font-mono text-xs font-medium text-primary">{c.compartmentBarcode}</TableCell>
-                        <TableCell>{c.salesOrderId ?? 'Ã¢â‚¬â€'}</TableCell>
+                        <TableCell>{c.salesOrderId ?? '—'}</TableCell>
                         <TableCell>{c.pickedItemBarcodes?.length ?? 0}</TableCell>
                         <TableCell><StatusBadge status={c.status ?? 'OPEN'} /></TableCell>
                       </TableRow>

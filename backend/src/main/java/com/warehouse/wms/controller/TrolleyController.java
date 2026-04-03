@@ -23,6 +23,12 @@ public class TrolleyController {
 
     private final TrolleyService trolleyService;
 
+    @Operation(summary = "List all trolleys")
+    @GetMapping
+    public ResponseEntity<List<Trolley>> getAll() {
+        return ResponseEntity.ok(trolleyService.getAllTrolleys());
+    }
+
     @Operation(summary = "Create trolley and bind compartments")
     @PostMapping
     public ResponseEntity<Trolley> create(@Valid @RequestBody TrolleyCreateRequest request) {

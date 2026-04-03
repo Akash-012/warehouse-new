@@ -137,7 +137,13 @@ export default function InventoryPage() {
       setAdjustItem(null);
       setAdjustQty('');
     },
-    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to adjust stock'),
+    onError: (err) => {
+      if (err?.response?.status === 403) {
+        toast.error('You do not have permission to adjust inventory');
+        return;
+      }
+      toast.error(err?.response?.data?.detail || 'Failed to adjust stock');
+    },
   });
 
   return (

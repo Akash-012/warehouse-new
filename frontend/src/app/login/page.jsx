@@ -27,6 +27,9 @@ export default function LoginPage() {
   // Clear any stale/expired token when landing on login
   useEffect(() => {
     localStorage.removeItem('wms_token');
+    localStorage.removeItem('wms_username');
+    localStorage.removeItem('wms_role');
+    localStorage.removeItem('wms_permissions');
   }, []);
 
   const {

@@ -88,10 +88,15 @@ export default function SettingsPage() {
   const queryClient = useQueryClient();
   const { theme, setTheme } = useTheme();
   const { can } = usePermissions();
+  const [authToken, setAuthToken] = useState('');
   const configuredApiBase = process.env.NEXT_PUBLIC_API_URL?.trim()?.replace(/\/$/, '');
   const resolvedApiBase = configuredApiBase || (typeof window !== 'undefined' ? window.location.origin : '');
   const apiBaseUrl = resolvedApiBase ? `${resolvedApiBase}/api` : '/api';
   const swaggerUrl = resolvedApiBase ? `${resolvedApiBase}/swagger-ui.html` : '/swagger-ui.html';
+
+  useEffect(() => {
+    setAuthToken(localStorage.getItem('wms_token') || '');
+  }, []);
 
   /* ── Notification prefs (local state / localStorage) ── */
   const [notifPickAlert,    setNotifPickAlert]    = useState(true);
@@ -134,16 +139,19 @@ export default function SettingsPage() {
 
   /* ── Current user ──────────────────────────────────── */
   const { data: me, isLoading: meLoading } = useQuery({
-    queryKey: ['me'],
+    queryKey: ['me', authToken],
     queryFn: () => api.get('/auth/me').then((r) => r.data).catch(() => {
       try {
-        const token = localStorage.getItem('wms_token');
+        const token = authToken || localStorage.getItem('wms_token');
         if (!token) return null;
         const payload = JSON.parse(atob(token.split('.')[1]));
         return { username: payload.sub, role: payload.role ?? 'USER' };
       } catch { return null; }
     }),
-    staleTime: 300_000,
+    enabled: !!authToken,
+    staleTime: 0,
+    refetchOnMount: 'always',
+    retry: false,
   });
 
   /* ── Warehouses ────────────────────────────────────── */
@@ -188,7 +196,7 @@ export default function SettingsPage() {
       toast.success('Password changed successfully');
       setCurrentPw(''); setNewPw(''); setConfirmPw('');
     } catch (err) {
-      toast.error(err?.response?.data?.message ?? 'Failed to change password');
+      toast.error(err?.response?.data?.detail ?? err?.response?.data?.message ?? 'Failed to change password');
     } finally {
       setPwSaving(false);
     }
@@ -197,7 +205,7 @@ export default function SettingsPage() {
   /* ── API health ────────────────────────────────────── */
   const { data: health, isLoading: healthLoading, refetch: refetchHealth } = useQuery({
     queryKey: ['health'],
-    queryFn: () => api.get('/actuator/health').then((r) => r.data),
+    queryFn: () => api.get(`${resolvedApiBase}/actuator/health`).then((r) => r.data),
     staleTime: 30_000,
     retry: false,
   });

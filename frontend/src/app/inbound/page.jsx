@@ -39,6 +39,13 @@ const receiveSchema = z.object({
   })).min(1, 'At least one line is required'),
 });
 
+const normalizePoStatus = (status) => {
+  const raw = String(status ?? '').toUpperCase();
+  if (raw === 'OPEN') return 'PENDING';
+  if (raw === 'PARTIALLY_RECEIVED') return 'PARTIAL';
+  return raw;
+};
+
 async function exportPOs(pos) {
   await exportWmsWorkbook({
     fileName: `purchase_orders_${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
@@ -86,10 +93,11 @@ export default function InboundPage() {
 
   const receiveMutation = useMutation({
     mutationFn: (payload) => api.post('/inbound/receive', payload),
-    onSuccess: ({ data }) => {
+    onSuccess: async ({ data }) => {
       setGrnResult(data.grnNo);
       toast.success(`GRN ${data.grnNo} created successfully`);
-      queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+      await queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+      await queryClient.refetchQueries({ queryKey: ['purchaseOrders'], type: 'active' });
       reset();
     },
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to receive PO'),
@@ -97,7 +105,9 @@ export default function InboundPage() {
 
   const filteredPOs = useMemo(() => {
     let list = purchaseOrders ?? [];
-    if (statusFilter !== 'ALL') list = list.filter((p) => p.status === statusFilter);
+    if (statusFilter !== 'ALL') {
+      list = list.filter((p) => normalizePoStatus(p.status) === statusFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((p) => String(p.poNumber ?? '').toLowerCase().includes(q) || String(p.supplier ?? '').toLowerCase().includes(q));
@@ -109,9 +119,9 @@ export default function InboundPage() {
     const pos = purchaseOrders ?? [];
     return {
       total:    pos.length,
-      pending:  pos.filter((p) => p.status === 'PENDING').length,
-      received: pos.filter((p) => p.status === 'RECEIVED').length,
-      partial:  pos.filter((p) => p.status === 'PARTIAL').length,
+      pending:  pos.filter((p) => normalizePoStatus(p.status) === 'PENDING').length,
+      received: pos.filter((p) => normalizePoStatus(p.status) === 'RECEIVED').length,
+      partial:  pos.filter((p) => normalizePoStatus(p.status) === 'PARTIAL').length,
     };
   }, [purchaseOrders]);
 
@@ -156,6 +166,7 @@ export default function InboundPage() {
                     <div className="space-y-1.5">
                       <Label htmlFor="poId">PO ID</Label>
                       <Input id="poId" placeholder="e.g. 1001" {...register('poId')} />
+                      <p className="text-xs text-muted-foreground">Use numeric PO ID from the list row, not PO Number.</p>
                       {errors.poId && <p className="text-xs text-destructive">{errors.poId.message}</p>}
                     </div>
                     <Separator />
@@ -255,13 +266,15 @@ export default function InboundPage() {
                 <TableRow key={po.id} className="table-row-hover">
                   <TableCell className="font-bold font-mono text-primary">{po.poNumber}</TableCell>
                   <TableCell className="font-medium">{po.supplier || '—'}</TableCell>
-                  <TableCell><StatusBadge status={po.status} /></TableCell>
+                  <TableCell><StatusBadge status={normalizePoStatus(po.status)} /></TableCell>
                   <TableCell className="font-semibold">{po.lineCount ?? po.lines?.length ?? '—'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                    {po.createdAt ? format(new Date(po.createdAt), 'dd MMM yyyy') : '—'}
+                    {(po.createdAt || po.expectedArrivalDate)
+                      ? format(new Date(po.createdAt || po.expectedArrivalDate), 'dd MMM yyyy')
+                      : '—'}
                   </TableCell>
                   <TableCell className="text-right">
-                    {po.status !== 'RECEIVED' && (
+                    {normalizePoStatus(po.status) !== 'RECEIVED' && (
                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
                         reset({ poId: po.id ?? po.poNumber ?? '', lines: [{ skuCode: '', quantity: 1, batchNo: '' }] });
                         setGrnResult(null);

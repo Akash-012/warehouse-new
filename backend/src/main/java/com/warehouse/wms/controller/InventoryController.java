@@ -66,7 +66,7 @@ public class InventoryController {
     }
 
     @PostMapping("/adjust")
-    @PreAuthorize("hasAuthority('INVENTORY_MANAGE')")
+    @PreAuthorize("hasAuthority('INVENTORY_ADJUST')")
     public ResponseEntity<Map<String, Object>> adjust(@RequestBody Map<String, Object> body) {
         Long inventoryId = Long.valueOf(body.get("inventoryId").toString());
         int quantity = Integer.parseInt(body.get("quantity").toString());

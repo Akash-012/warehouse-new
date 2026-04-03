@@ -28,6 +28,10 @@ public class TrolleyService {
     private final SalesOrderRepository salesOrderRepository;
     private final PickTaskRepository pickTaskRepository;
 
+    public List<Trolley> getAllTrolleys() {
+        return trolleyRepository.findAll();
+    }
+
     @Transactional
     public Trolley createTrolley(TrolleyCreateRequest request) {
         Trolley trolley = trolleyRepository.findByTrolleyIdentifier(request.getTrolleyBarcode())
