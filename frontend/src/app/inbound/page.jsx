@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useFieldArray, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -40,9 +40,16 @@ const receiveSchema = z.object({
 });
 
 const normalizePoStatus = (status) => {
-  const raw = String(status ?? '').toUpperCase();
-  if (raw === 'OPEN') return 'PENDING';
-  if (raw === 'PARTIALLY_RECEIVED') return 'PARTIAL';
+  const raw = String(status ?? '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, '_');
+
+  if (!raw) return '';
+  if (raw === 'OPEN' || raw === 'NEW') return 'PENDING';
+  if (raw.includes('PARTIAL')) return 'PARTIAL';
+  if (raw === 'RECEIVED') return 'RECEIVED';
+  if (raw === 'PENDING') return 'PENDING';
   return raw;
 };
 
@@ -75,6 +82,7 @@ export default function InboundPage() {
   const [grnResult, setGrnResult] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [selectedPoId, setSelectedPoId] = useState('');
 
 
   const { data: purchaseOrders, isLoading } = useQuery({
@@ -84,7 +92,7 @@ export default function InboundPage() {
     retry: false,
   });
 
-  const { register, control, handleSubmit, reset, formState: { errors } } = useForm({
+  const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(receiveSchema),
     defaultValues: { poId: '', lines: [{ skuCode: '', quantity: 1, batchNo: '' }] },
   });
@@ -102,6 +110,32 @@ export default function InboundPage() {
     },
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to receive PO'),
   });
+
+  const selectablePOs = useMemo(
+    () => (purchaseOrders ?? []).filter((p) => normalizePoStatus(p.status) !== 'RECEIVED'),
+    [purchaseOrders]
+  );
+
+  const { data: selectedPO, isLoading: selectedPoLoading } = useQuery({
+    queryKey: ['purchaseOrderDetail', selectedPoId],
+    queryFn: () => api.get(`/purchase-orders/${selectedPoId}`).then((r) => r.data),
+    enabled: open && !!selectedPoId,
+    staleTime: 30_000,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!selectedPO) return;
+    const lines = (selectedPO.lines ?? []).map((line) => ({
+      skuCode: line.skuCode,
+      quantity: line.orderedQuantity ?? 1,
+      batchNo: '',
+    }));
+    reset({
+      poId: selectedPO.id,
+      lines: lines.length ? lines : [{ skuCode: '', quantity: 1, batchNo: '' }],
+    });
+  }, [selectedPO, reset]);
 
   const filteredPOs = useMemo(() => {
     let list = purchaseOrders ?? [];
@@ -135,7 +169,17 @@ export default function InboundPage() {
             <Button size="sm" variant="outline" onClick={() => exportPOs(purchaseOrders ?? [])}>
               <Download className="size-3.5 mr-1.5" /> Export Excel
             </Button>
-            <Button size="sm" onClick={() => setOpen(true)}>
+            <Button
+              size="sm"
+              onClick={() => {
+                const firstPo = selectablePOs[0];
+                const firstPoId = firstPo ? String(firstPo.id) : '';
+                setSelectedPoId(firstPoId);
+                setGrnResult(null);
+                reset({ poId: firstPoId ? Number(firstPoId) : '', lines: [{ skuCode: '', quantity: 1, batchNo: '' }] });
+                setOpen(true);
+              }}
+            >
               <Plus className="size-3.5 mr-1.5" /> Receive PO
             </Button>
           </div>
@@ -145,7 +189,14 @@ export default function InboundPage() {
       {/* Receive PO Sheet */}
       <SlideOverForm
         open={open}
-        onOpenChange={(v) => { setOpen(v); if (!v) { setGrnResult(null); reset(); } }}
+        onOpenChange={(v) => {
+          setOpen(v);
+          if (!v) {
+            setGrnResult(null);
+            setSelectedPoId('');
+            reset();
+          }
+        }}
         title="Receive Purchase Order"
         description="Enter the PO ID and items being received. A GRN will be created."
       >
@@ -162,11 +213,38 @@ export default function InboundPage() {
                     <Button onClick={() => setOpen(false)} className="w-full">Done</Button>
                   </div>
                 ) : (
-                  <form onSubmit={handleSubmit((d) => receiveMutation.mutate(d))} className="space-y-4">
+                  <form
+                    onSubmit={handleSubmit((d) => {
+                      const poId = Number(selectedPoId || d.poId);
+                      if (!poId) {
+                        toast.error('Please select a purchase order');
+                        return;
+                      }
+                      receiveMutation.mutate({ ...d, poId });
+                    })}
+                    className="space-y-4"
+                  >
                     <div className="space-y-1.5">
                       <Label htmlFor="poId">PO ID</Label>
-                      <Input id="poId" placeholder="e.g. 1001" {...register('poId')} />
-                      <p className="text-xs text-muted-foreground">Use numeric PO ID from the list row, not PO Number.</p>
+                      <Select
+                        value={selectedPoId}
+                        onValueChange={(v) => {
+                          setSelectedPoId(v);
+                          setValue('poId', Number(v));
+                        }}
+                      >
+                        <SelectTrigger id="poId" className="h-10">
+                          <SelectValue placeholder="Select PO" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {selectablePOs.map((po) => (
+                            <SelectItem key={po.id} value={String(po.id)}>
+                              {po.poNumber} - {po.supplier}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">PO lines auto-load after selection. Only non-received POs are listed.</p>
                       {errors.poId && <p className="text-xs text-destructive">{errors.poId.message}</p>}
                     </div>
                     <Separator />
@@ -182,7 +260,12 @@ export default function InboundPage() {
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
                               <Label className="text-xs">SKU Code</Label>
-                              <Input placeholder="e.g. SKU-001" className="h-8 text-sm" {...register(`lines.${i}.skuCode`)} />
+                              <Input
+                                placeholder="e.g. SKU-001"
+                                className="h-8 text-sm"
+                                readOnly={!!selectedPO?.lines?.length}
+                                {...register(`lines.${i}.skuCode`)}
+                              />
                               {errors.lines?.[i]?.skuCode && <p className="text-[10px] text-destructive">{errors.lines[i].skuCode.message}</p>}
                             </div>
                             <div className="space-y-1">
@@ -206,7 +289,7 @@ export default function InboundPage() {
                     </div>
                       <SheetFooter>
                       <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                      <Button type="submit" disabled={receiveMutation.isPending}>
+                      <Button type="submit" disabled={receiveMutation.isPending || selectedPoLoading || !selectedPoId}>
                         {receiveMutation.isPending && <Loader2 className="size-3.5 mr-2 animate-spin" />}
                         Receive Goods
                       </Button>
@@ -276,7 +359,10 @@ export default function InboundPage() {
                   <TableCell className="text-right">
                     {normalizePoStatus(po.status) !== 'RECEIVED' && (
                       <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
-                        reset({ poId: po.id ?? po.poNumber ?? '', lines: [{ skuCode: '', quantity: 1, batchNo: '' }] });
+                        const poId = String(po.id ?? '');
+                        setSelectedPoId(poId);
+                        setValue('poId', Number(poId));
+                        reset({ poId: Number(poId), lines: [{ skuCode: '', quantity: 1, batchNo: '' }] });
                         setGrnResult(null);
                         setOpen(true);
                       }}>
