@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>WMS Pro – Client Flow Document</title>
+<style>
+  /* ── Page Setup ── */
+  @page { size: A4; margin: 2.5cm 2cm; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: "Calibri", "Segoe UI", Arial, sans-serif;
+    font-size: 11pt;
+    color: #1a1a2e;
+    background: #fff;
+    line-height: 1.6;
+  }
+
+  /* ── Utility ── */
+  .page-break { page-break-after: always; }
+  .no-break   { page-break-inside: avoid; }
+
+  /* ── Cover Page ── */
+  .cover {
+    width: 100%;
+    min-height: 97vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(145deg, #0f3460 0%, #16213e 40%, #0d1b2a 100%);
+    color: #fff;
+    text-align: center;
+    padding: 60px 40px;
+    border-radius: 4px;
+  }
+  .cover .logo-badge {
+    background: #e94560;
+    color: #fff;
+    font-size: 13pt;
+    font-weight: 700;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    padding: 8px 28px;
+    border-radius: 30px;
+    margin-bottom: 36px;
+  }
+  .cover h1 {
+    font-size: 36pt;
+    font-weight: 800;
+    letter-spacing: -1px;
+    line-height: 1.15;
+    margin-bottom: 12px;
+  }
+  .cover h1 span { color: #e94560; }
+  .cover .subtitle {
+    font-size: 14pt;
+    color: #a8b2d8;
+    margin-bottom: 48px;
+    max-width: 540px;
+  }
+  .cover .meta-row {
+    display: flex;
+    gap: 40px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 12px;
+  }
+  .cover .meta-item {
+    text-align: center;
+  }
+  .cover .meta-item .label {
+    font-size: 8pt;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: #a8b2d8;
+    margin-bottom: 4px;
+  }
+  .cover .meta-item .value {
+    font-size: 12pt;
+    font-weight: 600;
+    color: #e2e8f0;
+  }
+  .cover .divider {
+    width: 60px;
+    height: 4px;
+    background: #e94560;
+    border-radius: 2px;
+    margin: 32px auto;
+  }
+  .cover .confidential {
+    margin-top: 56px;
+    font-size: 8.5pt;
+    color: #64748b;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    border: 1px solid #334155;
+    padding: 6px 18px;
+    border-radius: 20px;
+  }
+
+  /* ── TOC ── */
+  .toc-container {
+    padding: 40px 20px 20px;
+    max-width: 700px;
+    margin: 0 auto;
+  }
+  .toc-title {
+    font-size: 22pt;
+    font-weight: 700;
+    color: #0f3460;
+    margin-bottom: 24px;
+    border-bottom: 3px solid #e94560;
+    padding-bottom: 8px;
+  }
+  .toc-entry {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 7px 0;
+    border-bottom: 1px dotted #cbd5e1;
+    font-size: 11pt;
+  }
+  .toc-entry.level2 { padding-left: 20px; font-size: 10.5pt; color: #475569; }
+  .toc-entry .toc-section { color: #0f3460; font-weight: 600; }
+  .toc-entry.level2 .toc-section { font-weight: 400; color: #475569; }
+  .toc-entry .toc-page { color: #94a3b8; font-size: 10pt; }
+
+  /* ── Section Container ── */
+  .section-container {
+    padding: 40px 20px 20px;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+
+  /* ── Section Title ── */
+  .section-title {
+    font-size: 20pt;
+    font-weight: 700;
+    color: #0f3460;
+    margin-bottom: 6px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid #e94560;
+  }
+  .section-number {
+    color: #e94560;
+    margin-right: 6px;
+  }
+  .section-intro {
+    color: #475569;
+    margin: 14px 0 24px;
+    font-size: 10.5pt;
+    line-height: 1.7;
+  }
+
+  /* ── Sub-heading ── */
+  h3 {
+    font-size: 13pt;
+    font-weight: 700;
+    color: #1e293b;
+    margin: 28px 0 10px;
+    padding-left: 10px;
+    border-left: 4px solid #0f3460;
+  }
+  h4 {
+    font-size: 11pt;
+    font-weight: 700;
+    color: #0f3460;
+    margin: 18px 0 6px;
+  }
+
+  /* ── Flow Diagram (pure HTML/CSS) ── */
+  .flow-wrapper {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 28px 20px;
+    margin: 20px 0;
+    overflow-x: auto;
+  }
+  .flow-title {
+    font-size: 10pt;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    margin-bottom: 20px;
+    text-align: center;
+  }
+
+  /* Node styles */
+  .flow-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 6px 0;
+  }
+  .flow-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+  }
+  .node {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 8.5pt;
+    font-weight: 600;
+    padding: 8px 14px;
+    border-radius: 8px;
+    min-width: 110px;
+    max-width: 160px;
+    line-height: 1.3;
+  }
+  .node-blue   { background: #dbeafe; color: #1d4ed8; border: 1.5px solid #93c5fd; }
+  .node-green  { background: #dcfce7; color: #166534; border: 1.5px solid #86efac; }
+  .node-amber  { background: #fef3c7; color: #92400e; border: 1.5px solid #fcd34d; }
+  .node-red    { background: #fee2e2; color: #991b1b; border: 1.5px solid #fca5a5; }
+  .node-purple { background: #ede9fe; color: #5b21b6; border: 1.5px solid #c4b5fd; }
+  .node-teal   { background: #ccfbf1; color: #0f5346; border: 1.5px solid #5eead4; }
+  .node-indigo { background: #e0e7ff; color: #3730a3; border: 1.5px solid #a5b4fc; }
+  .node-pink   { background: #fce7f3; color: #9d174d; border: 1.5px solid #f9a8d4; }
+  .node-dark   { background: #1e293b; color: #f1f5f9; border: 1.5px solid #334155; }
+  .node-gray   { background: #f1f5f9; color: #475569; border: 1.5px solid #cbd5e1; }
+  .node-round  { border-radius: 50px; }
+  .node-diamond {
+    transform: rotate(45deg);
+    width: 80px; height: 80px;
+    min-width: unset; max-width: unset;
+    padding: 0;
+  }
+  .node-diamond span { transform: rotate(-45deg); display: block; font-size: 7.5pt; }
+
+  /* Arrows */
+  .arrow-right { font-size: 16pt; color: #94a3b8; line-height: 1; }
+  .arrow-down  { font-size: 14pt; color: #94a3b8; line-height: 0.8; margin: 2px 0; }
+  .arrow-label { font-size: 7.5pt; color: #94a3b8; }
+
+  /* ── Cards ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px;
+    margin: 18px 0;
+  }
+  .card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    border-top: 4px solid;
+  }
+  .card.blue   { border-top-color: #3b82f6; }
+  .card.green  { border-top-color: #22c55e; }
+  .card.amber  { border-top-color: #f59e0b; }
+  .card.purple { border-top-color: #a855f7; }
+  .card.red    { border-top-color: #ef4444; }
+  .card.teal   { border-top-color: #14b8a6; }
+  .card.indigo { border-top-color: #6366f1; }
+  .card.pink   { border-top-color: #ec4899; }
+  .card.dark   { border-top-color: #1e293b; }
+  .card .card-icon { font-size: 18pt; margin-bottom: 8px; }
+  .card .card-title { font-size: 10.5pt; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+  .card .card-desc  { font-size: 9pt; color: #64748b; line-height: 1.5; }
+
+  /* ── Permission Matrix Table ── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 9.5pt;
+    margin: 16px 0;
+  }
+  th {
+    background: #0f3460;
+    color: #fff;
+    padding: 9px 10px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 8px 10px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: top;
+  }
+  tr:nth-child(even) td { background: #f8fafc; }
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 20px;
+    font-size: 8pt;
+    font-weight: 600;
+    margin: 1px 2px;
+  }
+  .badge-blue   { background: #dbeafe; color: #1d4ed8; }
+  .badge-green  { background: #dcfce7; color: #166534; }
+  .badge-amber  { background: #fef3c7; color: #92400e; }
+  .badge-purple { background: #ede9fe; color: #5b21b6; }
+  .badge-red    { background: #fee2e2; color: #991b1b; }
+  .badge-gray   { background: #f1f5f9; color: #475569; }
+  .check { color: #22c55e; font-size: 12pt; }
+  .cross { color: #ef4444; font-size: 12pt; }
+
+  /* ── Info Boxes ── */
+  .info-box {
+    border-left: 5px solid;
+    padding: 14px 16px;
+    border-radius: 0 8px 8px 0;
+    margin: 14px 0;
+    font-size: 10pt;
+  }
+  .info-box.blue   { border-color: #3b82f6; background: #eff6ff; }
+  .info-box.green  { border-color: #22c55e; background: #f0fdf4; }
+  .info-box.amber  { border-color: #f59e0b; background: #fffbeb; }
+  .info-box.red    { border-color: #ef4444; background: #fef2f2; }
+  .info-box .info-title { font-weight: 700; margin-bottom: 4px; font-size: 10.5pt; }
+
+  /* ── Step List ── */
+  .step-list { margin: 14px 0; }
+  .step-item {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 12px 0;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .step-num {
+    flex-shrink: 0;
+    width: 30px; height: 30px;
+    background: #0f3460;
+    color: #fff;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10pt;
+    font-weight: 700;
+  }
+  .step-content .step-title {
+    font-weight: 700;
+    font-size: 10.5pt;
+    color: #1e293b;
+    margin-bottom: 3px;
+  }
+  .step-content .step-desc {
+    font-size: 9.5pt;
+    color: #64748b;
+    line-height: 1.5;
+  }
+
+  /* ── Module Tag ── */
+  .module-tag {
+    display: inline-block;
+    background: #0f3460;
+    color: #fff;
+    font-size: 8pt;
+    font-weight: 600;
+    padding: 2px 10px;
+    border-radius: 4px;
+    margin-right: 6px;
+    letter-spacing: 0.5px;
+  }
+
+  /* ── Integration Box ── */
+  .integration-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .int-box {
+    background: linear-gradient(135deg, #0f3460, #16213e);
+    color: #fff;
+    border-radius: 10px;
+    padding: 16px;
+    text-align: center;
+  }
+  .int-box .int-icon { font-size: 20pt; margin-bottom: 6px; }
+  .int-box .int-title { font-size: 10.5pt; font-weight: 700; margin-bottom: 4px; }
+  .int-box .int-desc  { font-size: 8.5pt; color: #94a3b8; }
+
+  /* ── Footer ── */
+  .doc-footer {
+    text-align: center;
+    padding: 30px 20px 20px;
+    font-size: 8.5pt;
+    color: #94a3b8;
+    border-top: 2px solid #f1f5f9;
+    margin-top: 40px;
+  }
+
+  /* ── Print overrides ── */
+  @media print {
+    .cover { min-height: 99vh; border-radius: 0; }
+    body { font-size: 10pt; }
+    .section-container { max-width: 100%; padding: 30px 10px 10px; }
+  }
+
+  /* ── Architecture Diagram ── */
+  .arch-box {
+    border: 2px solid;
+    border-radius: 10px;
+    padding: 16px 18px;
+    text-align: center;
+    font-size: 9.5pt;
+    font-weight: 600;
+  }
+  .arch-box .arch-sub { font-size: 8pt; font-weight: 400; color: #64748b; margin-top: 3px; }
+  .arch-layers {
+    display: grid;
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .arch-row {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .arch-row .arch-box { flex: 1; min-width: 120px; max-width: 200px; }
+  .arch-connector {
+    text-align: center;
+    color: #94a3b8;
+    font-size: 11pt;
+    padding: 4px 0;
+  }
+  .arch-connector span { font-size: 8pt; color: #cbd5e1; margin-left: 4px; }
+
+  /* inventory states */
+  .state-flow {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin: 16px 0;
+  }
+  .state-pill {
+    padding: 6px 14px;
+    border-radius: 50px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- COVER PAGE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="cover page-break">
+  <div class="logo-badge">WMS Pro</div>
+  <h1>Warehouse Management<br/><span>System</span></h1>
+  <p class="subtitle">Complete Client Flow &amp; System Architecture Document</p>
+  <div class="divider"></div>
+  <div class="meta-row">
+    <div class="meta-item">
+      <div class="label">Document Date</div>
+      <div class="value">April 4, 2026</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Document Type</div>
+      <div class="value">Client Deliverable</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Version</div>
+      <div class="value">1.0.0</div>
+    </div>
+    <div class="meta-item">
+      <div class="label">Platform</div>
+      <div class="value">Next.js + Spring Boot</div>
+    </div>
+  </div>
+  <div class="confidential">Confidential — For Client Use Only</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- TABLE OF CONTENTS -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="toc-container page-break">
+  <div class="toc-title">Table of Contents</div>
+
+  <div class="toc-entry"><span class="toc-section">1. Executive Summary</span><span class="toc-page">3</span></div>
+  <div class="toc-entry"><span class="toc-section">2. Solution Architecture Overview</span><span class="toc-page">4</span></div>
+  <div class="toc-entry level2"><span class="toc-section">2.1 Technology Stack</span></div>
+  <div class="toc-entry level2"><span class="toc-section">2.2 Layer Architecture Diagram</span></div>
+  <div class="toc-entry level2"><span class="toc-section">2.3 Security Model (JWT + RBAC)</span></div>
+  <div class="toc-entry"><span class="toc-section">3. Master Data Setup Flow</span><span class="toc-page">6</span></div>
+  <div class="toc-entry"><span class="toc-section">4. Inbound &amp; Receiving Flow</span><span class="toc-page">7</span></div>
+  <div class="toc-entry level2"><span class="toc-section">4.1 Purchase Order Registration</span></div>
+  <div class="toc-entry level2"><span class="toc-section">4.2 GRN Creation (Goods Receipt)</span></div>
+  <div class="toc-entry"><span class="toc-section">5. Putaway Flow</span><span class="toc-page">8</span></div>
+  <div class="toc-entry"><span class="toc-section">6. Inventory Management Flow</span><span class="toc-page">9</span></div>
+  <div class="toc-entry"><span class="toc-section">7. Outbound Operations Flow</span><span class="toc-page">10</span></div>
+  <div class="toc-entry level2"><span class="toc-section">7.1 Sales Order Creation</span></div>
+  <div class="toc-entry level2"><span class="toc-section">7.2 Trolley Assignment</span></div>
+  <div class="toc-entry level2"><span class="toc-section">7.3 Picking (Barcode Scan)</span></div>
+  <div class="toc-entry level2"><span class="toc-section">7.4 Packing Verification</span></div>
+  <div class="toc-entry level2"><span class="toc-section">7.5 Shipping Confirmation</span></div>
+  <div class="toc-entry"><span class="toc-section">8. End-to-End Warehouse Operations Flow</span><span class="toc-page">12</span></div>
+  <div class="toc-entry"><span class="toc-section">9. Dashboard &amp; Reporting</span><span class="toc-page">13</span></div>
+  <div class="toc-entry"><span class="toc-section">10. User, Roles &amp; Permissions</span><span class="toc-page">14</span></div>
+  <div class="toc-entry"><span class="toc-section">11. Admin Control Flow</span><span class="toc-page">16</span></div>
+  <div class="toc-entry"><span class="toc-section">12. Module Summary &amp; Benefits</span><span class="toc-page">17</span></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 1 – EXECUTIVE SUMMARY -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">1.</span> Executive Summary</div>
+  <p class="section-intro">
+    WMS Pro is a full-stack, enterprise-grade Warehouse Management System built on
+    <strong>Next.js 14</strong> (frontend) and <strong>Spring Boot 3 / Java 17</strong> (backend)
+    with a <strong>MySQL</strong> relational database. It provides end-to-end traceability of
+    warehouse operations — from supplier goods receipt through putaway, order picking, packing, and
+    final shipment — under a secure role-based access control model.
+  </p>
+
+  <div class="card-grid">
+    <div class="card blue no-break">
+      <div class="card-icon">📦</div>
+      <div class="card-title">Inbound &amp; GRN</div>
+      <div class="card-desc">Receive purchase orders, create Goods Receipt Notes, track supplier deliveries.</div>
+    </div>
+    <div class="card green no-break">
+      <div class="card-icon">🗂️</div>
+      <div class="card-title">Smart Putaway</div>
+      <div class="card-desc">Auto-generate putaway tasks with bin-level barcode scan execution.</div>
+    </div>
+    <div class="card amber no-break">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Live Inventory</div>
+      <div class="card-desc">Real-time bin-level stock ledger with multi-state tracking and adjustments.</div>
+    </div>
+    <div class="card purple no-break">
+      <div class="card-icon">🛒</div>
+      <div class="card-title">Order Fulfillment</div>
+      <div class="card-desc">Sales orders drive picking tasks, trolley assignment, packing, and shipping.</div>
+    </div>
+    <div class="card teal no-break">
+      <div class="card-icon">🔍</div>
+      <div class="card-title">Barcode Scanning</div>
+      <div class="card-desc">Every operational step verified by barcode scan — picking, putaway, packing.</div>
+    </div>
+    <div class="card indigo no-break">
+      <div class="card-icon">🛡️</div>
+      <div class="card-title">Role-Based Access</div>
+      <div class="card-desc">Granular permission matrix per role. JWT-secured APIs. Audit trail.</div>
+    </div>
+    <div class="card pink no-break">
+      <div class="card-icon">📈</div>
+      <div class="card-title">Dashboard &amp; Reports</div>
+      <div class="card-desc">KPI widgets, bin utilization, shipment trends, live event feed.</div>
+    </div>
+    <div class="card dark no-break">
+      <div class="card-icon">🤖</div>
+      <div class="card-title">AI Assistant</div>
+      <div class="card-desc">Optional AI chat for warehouse queries, stock questions, and guidance.</div>
+    </div>
+  </div>
+
+  <div class="info-box green">
+    <div class="info-title">Business Outcome</div>
+    WMS Pro eliminates manual tracking, reduces picking errors through scan verification, provides
+    real-time inventory visibility across all bins, and gives management full operational control
+    with role-gated access at every module.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 2 – SOLUTION ARCHITECTURE -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">2.</span> Solution Architecture Overview</div>
+
+  <h3>2.1 Technology Stack</h3>
+  <table>
+    <tr><th>Layer</th><th>Technology</th><th>Purpose</th></tr>
+    <tr><td>Frontend</td><td>Next.js 14, React, Tailwind CSS, shadcn/ui</td><td>User portal — all operational screens</td></tr>
+    <tr><td>State Management</td><td>TanStack Query (React Query)</td><td>Server-state caching &amp; sync</td></tr>
+    <tr><td>Backend API</td><td>Spring Boot 3, Java 17, REST</td><td>Business logic, validations, service layer</td></tr>
+    <tr><td>Security</td><td>Spring Security + JWT</td><td>Stateless auth, role &amp; permission enforcement</td></tr>
+    <tr><td>Database</td><td>MySQL 8</td><td>All persistent data — stock, orders, users</td></tr>
+    <tr><td>ORM</td><td>Spring Data JPA / Hibernate</td><td>Entity management, query layer</td></tr>
+    <tr><td>Build</td><td>Maven (backend), npm (frontend)</td><td>Build &amp; dependency management</td></tr>
+    <tr><td>Docs/Test</td><td>Swagger / OpenAPI 3</td><td>Live API documentation</td></tr>
+  </table>
+
+  <h3>2.2 Layer Architecture Diagram</h3>
+
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">System Layer Architecture</div>
+    <!-- Layer 1: Users -->
+    <div class="arch-layers">
+      <div class="arch-row">
+        <div class="arch-box" style="border-color:#94a3b8; background:#f8fafc; flex:0 0 auto; width:100%; max-width:600px;">
+          <strong>👤 Warehouse Users</strong>
+          <div class="arch-sub">Admin · Warehouse Manager · Supervisor · Operator · Picker · Packer</div>
+        </div>
+      </div>
+
+      <div class="arch-connector">⬇ &nbsp;Browser / Web Portal<span></span></div>
+
+      <!-- Layer 2: Frontend -->
+      <div class="arch-row">
+        <div class="arch-box" style="border-color:#3b82f6; background:#eff6ff; flex: 0 0 auto; width:100%; max-width:600px;">
+          <strong>🖥️ Frontend Portal</strong>
+          <div class="arch-sub">Next.js 14 · React · Tailwind CSS · shadcn/ui<br/>15 operational modules • Real-time dashboards</div>
+        </div>
+      </div>
+
+      <div class="arch-connector">⬇ &nbsp;HTTPS REST Calls + JWT Bearer Token<span></span></div>
+
+      <!-- Layer 3: API -->
+      <div class="arch-row">
+        <div class="arch-box" style="border-color:#22c55e; background:#f0fdf4; width:calc(33% - 8px);">
+          <strong>🔐 Auth API</strong>
+          <div class="arch-sub">Spring Security<br/>JWT Issue &amp; Verify</div>
+        </div>
+        <div class="arch-box" style="border-color:#22c55e; background:#f0fdf4; width:calc(67% - 4px);">
+          <strong>⚙️ WMS Service Layer</strong>
+          <div class="arch-sub">Spring Boot REST · 15+ Controllers · Permission Guards<br/>Inbound · Putaway · Inventory · Orders · Picking · Packing · Shipping</div>
+        </div>
+      </div>
+
+      <div class="arch-connector">⬇ &nbsp;JPA / JDBC<span></span></div>
+
+      <!-- Layer 4: DB -->
+      <div class="arch-row">
+        <div class="arch-box" style="border-color:#f59e0b; background:#fffbeb; flex: 0 0 auto; width:100%; max-width:600px;">
+          <strong>🗄️ MySQL Database</strong>
+          <div class="arch-sub">Master Data · Inventory · Orders · Picking · Shipping · Users · Audit</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>2.3 Security Model</h3>
+  <div class="info-box blue">
+    <div class="info-title">JWT + Role-Based Access Control (RBAC)</div>
+    Every API endpoint is guarded by Spring Security. On login, the system issues a signed JWT token.
+    Each request must carry this token. The backend checks the user's assigned role permissions
+    before executing any operation. Permission codes like <code>INBOUND_RECEIVE</code>,
+    <code>PICKING_VIEW</code>, <code>ORDERS_CREATE</code> control fine-grained access.
+  </div>
+
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Authentication &amp; Authorization Flow</div>
+    <div class="flow-row">
+      <div class="node node-blue">User enters<br/>Username + Password</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-green">POST /api/auth/login</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-amber">Validate credentials<br/>in DB</div>
+    </div>
+    <div style="text-align:center; margin:4px 0;"><div class="arrow-down">↓</div><div class="arrow-label">Success</div></div>
+    <div class="flow-row">
+      <div class="node node-purple">JWT Token issued<br/>(signed, 24h)</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-teal">Frontend stores<br/>Token in session</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-indigo">Every API call includes<br/>Bearer Token header</div>
+    </div>
+    <div style="text-align:center; margin:4px 0;"><div class="arrow-down">↓</div><div class="arrow-label">Per Request</div></div>
+    <div class="flow-row">
+      <div class="node node-green">Spring Security<br/>validates JWT</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-amber">Check RBAC<br/>Permission Code</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-blue node-round">✓ Serve API<br/>or ✗ 403 Deny</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 3 – MASTER DATA -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">3.</span> Master Data Setup Flow</div>
+  <p class="section-intro">
+    Before warehouse operations begin, the Admin configures the physical warehouse structure
+    and product catalog (SKUs). This is a one-time hierarchical setup that all operations reference.
+  </p>
+
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Warehouse Location Hierarchy</div>
+    <div class="flow-row">
+      <div class="node node-dark" style="min-width:130px;">🏭 Warehouse<br/><span style="font-size:7.5pt;font-weight:400;">Name · Location</span></div>
+      <div class="arrow-right">→</div>
+      <div class="node node-blue" style="min-width:130px;">📍 Zone<br/><span style="font-size:7.5pt;font-weight:400;">e.g. Zone-A, Cold Storage</span></div>
+      <div class="arrow-right">→</div>
+      <div class="node node-indigo" style="min-width:130px;">🚶 Aisle<br/><span style="font-size:7.5pt;font-weight:400;">e.g. Aisle-01</span></div>
+    </div>
+    <div style="text-align:right; padding-right:50px; margin:4px 0;"><div class="arrow-down">↓</div></div>
+    <div class="flow-row" style="justify-content: flex-end; padding-right:20px;">
+      <div class="node node-green" style="min-width:130px;">📦 Bin<br/><span style="font-size:7.5pt;font-weight:400;">Barcode · Dimensions<br/>Volume Capacity</span></div>
+      <div class="arrow-right" style="transform:scaleX(-1);">→</div>
+      <div class="node node-amber" style="min-width:130px;">🗄️ Rack<br/><span style="font-size:7.5pt;font-weight:400;">e.g. Rack-01, Rack-02</span></div>
+    </div>
+  </div>
+
+  <h3>SKU / Product Catalog</h3>
+  <table>
+    <tr><th>Field</th><th>Description</th></tr>
+    <tr><td>SKU Code</td><td>Unique product identifier barcode</td></tr>
+    <tr><td>Description</td><td>Product name and details</td></tr>
+    <tr><td>Dimensions</td><td>Length × Width × Height in cm (for bin volume calculation)</td></tr>
+    <tr><td>Weight</td><td>Used for shipping manifest</td></tr>
+  </table>
+
+  <div class="info-box amber">
+    <div class="info-title">Why This Matters</div>
+    Every inbound, putaway, picking, and shipping operation references the bin barcode and SKU code
+    from master data. Accurate setup ensures scan accuracy and prevents mislocation errors.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 4 – INBOUND & RECEIVING -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">4.</span> Inbound &amp; Receiving Flow</div>
+  <p class="section-intro">
+    The inbound module handles supplier deliveries. A Purchase Order (PO) is registered in the system;
+    when goods arrive, the operator scans/receives the PO to generate a Goods Receipt Note (GRN).
+  </p>
+
+  <h3>4.1 Purchase Order Registration</h3>
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Purchase Order Flow</div>
+    <div class="flow-row">
+      <div class="node node-blue">Admin/Supervisor<br/>creates PO</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-gray">PO stored with:<br/>PO Number · Supplier<br/>Expected Date · Lines</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-amber">PO Status:<br/><strong>OPEN</strong></div>
+    </div>
+    <div style="text-align:center; margin:6px 0;"><div class="arrow-down">↓</div><div class="arrow-label">Goods Arrive</div></div>
+    <div class="flow-row">
+      <div class="node node-green">Operator selects PO<br/>on Inbound screen</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-teal">POST /api/inbound/receive<br/>with quantities received</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-purple">GRN Created<br/>(Goods Receipt Note)</div>
+    </div>
+  </div>
+
+  <h3>4.2 Goods Receipt Note (GRN)</h3>
+  <div class="step-list">
+    <div class="step-item no-break">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Select Open Purchase Order</div>
+        <div class="step-desc">Operator views all open POs from the Inbound page. Selects the matching supplier PO.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Enter Received Quantities</div>
+        <div class="step-desc">Line-by-line quantities are entered (partial receipts supported). Batch/serial numbers captured if applicable.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">GRN Generated</div>
+        <div class="step-desc">System creates a GRN with all received lines. Stock state is set to <strong>RECEIVED</strong>. PO status updates to PARTIALLY_RECEIVED or RECEIVED.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Inventory Records Created</div>
+        <div class="step-desc">Individual inventory records are created per SKU per batch with quantity and state RECEIVED — ready for putaway.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 5 – PUTAWAY -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">5.</span> Putaway Flow</div>
+  <p class="section-intro">
+    After GRN, the Putaway Engine automatically assigns bin locations for each received SKU.
+    Operators execute putaway by scanning both the item barcode and the destination bin barcode.
+  </p>
+
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Putaway Task Generation &amp; Execution Flow</div>
+    <div class="flow-row">
+      <div class="node node-blue">GRN Confirmed</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-amber">Putaway Engine<br/>analyses SKU dimensions<br/>vs bin capacity</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-purple">Putaway Tasks<br/>Generated (PENDING)</div>
+    </div>
+    <div style="text-align:center; margin:8px 0;"><div class="arrow-down">↓</div><div class="arrow-label">Operator picks up task</div></div>
+    <div class="flow-row">
+      <div class="node node-indigo">Operator views<br/>Pending Tasks</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-teal">Scan Item Barcode<br/>(SKU label)</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-green">Scan Bin Barcode<br/>(destination bin)</div>
+    </div>
+    <div style="text-align:center; margin:8px 0;"><div class="arrow-down">↓</div><div class="arrow-label">System validates match</div></div>
+    <div class="flow-row">
+      <div class="node node-green">Task → COMPLETED<br/>Inventory → AVAILABLE</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-teal">Bin occupied volume<br/>updated</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-blue">Stock ready for<br/>order fulfillment</div>
+    </div>
+  </div>
+
+  <h3>Putaway Engine Logic</h3>
+  <table>
+    <tr><th>Rule</th><th>Description</th></tr>
+    <tr><td>Volume Check</td><td>System compares SKU dimensions against bin remaining capacity</td></tr>
+    <tr><td>Zone Matching</td><td>SKU category can be mapped to preferred zones (e.g., cold storage)</td></tr>
+    <tr><td>Priority</td><td>Tasks are ordered by priority score for efficient pick path</td></tr>
+    <tr><td>Scan Validation</td><td>Both item barcode AND bin barcode must match the task — prevents mislocation</td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 6 – INVENTORY -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">6.</span> Inventory Management Flow</div>
+  <p class="section-intro">
+    Inventory is tracked at bin-level with a multi-state lifecycle. Every operational action
+    automatically transitions stock through defined states with full traceability.
+  </p>
+
+  <h3>Inventory State Lifecycle</h3>
+
+  <div class="state-flow">
+    <div class="state-pill" style="background:#dbeafe;color:#1d4ed8;">📥 RECEIVED</div>
+    <div class="arrow-right" style="font-size:12pt;color:#94a3b8;">→</div>
+    <div class="state-pill" style="background:#fef3c7;color:#92400e;">🔄 IN_PUTAWAY</div>
+    <div class="arrow-right" style="font-size:12pt;color:#94a3b8;">→</div>
+    <div class="state-pill" style="background:#dcfce7;color:#166534;">✅ AVAILABLE</div>
+    <div class="arrow-right" style="font-size:12pt;color:#94a3b8;">→</div>
+    <div class="state-pill" style="background:#ede9fe;color:#5b21b6;">🔒 RESERVED</div>
+    <div class="arrow-right" style="font-size:12pt;color:#94a3b8;">→</div>
+    <div class="state-pill" style="background:#fce7f3;color:#9d174d;">📤 PICKED</div>
+    <div class="arrow-right" style="font-size:12pt;color:#94a3b8;">→</div>
+    <div class="state-pill" style="background:#ccfbf1;color:#0f5346;">📦 PACKED</div>
+    <div class="arrow-right" style="font-size:12pt;color:#94a3b8;">→</div>
+    <div class="state-pill" style="background:#e0e7ff;color:#3730a3;">🚚 SHIPPED</div>
+  </div>
+
+  <table style="margin-top:18px;">
+    <tr><th>State</th><th>Triggered By</th><th>Description</th></tr>
+    <tr><td><span class="badge badge-blue">RECEIVED</span></td><td>GRN Creation</td><td>Goods received, not yet put away in bin</td></tr>
+    <tr><td><span class="badge badge-amber">IN_PUTAWAY</span></td><td>Putaway Task Start</td><td>Item being moved to bin location</td></tr>
+    <tr><td><span class="badge badge-green">AVAILABLE</span></td><td>Putaway Completion</td><td>Stock in bin, available for orders</td></tr>
+    <tr><td><span class="badge badge-purple">RESERVED</span></td><td>Order Creation</td><td>Stock reserved for a confirmed sales order</td></tr>
+    <tr><td><span class="badge badge-red">PICKED</span></td><td>Pick Scan</td><td>Physically picked from bin onto trolley</td></tr>
+    <tr><td><span class="badge badge-blue">PACKED</span></td><td>Pack Scan</td><td>Item verified and packed in shipping box</td></tr>
+    <tr><td><span class="badge badge-gray">SHIPPED</span></td><td>Shipment Confirmation</td><td>Order dispatched, inventory removed from bin</td></tr>
+  </table>
+
+  <h3>Manual Inventory Adjustment</h3>
+  <div class="info-box amber">
+    <div class="info-title">Stock Correction (INVENTORY_ADJUST permission required)</div>
+    Supervisors can manually adjust stock quantities with a reason code (e.g., damage, cycle count correction).
+    All adjustments are logged in the movement log for audit purposes.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 7 – OUTBOUND OPERATIONS -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">7.</span> Outbound Operations Flow</div>
+  <p class="section-intro">
+    The outbound process covers the complete fulfillment journey from customer order creation
+    through picking, trolley management, packing verification, and shipment dispatch.
+  </p>
+
+  <h3>7.1 Sales Order Creation</h3>
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Order Creation Flow</div>
+    <div class="flow-row">
+      <div class="node node-blue">Supervisor / Operator<br/>creates Sales Order</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-gray">Order lines: SKU + Qty<br/>Customer name</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-amber">System checks<br/>AVAILABLE stock</div>
+    </div>
+    <div style="text-align:center; margin:6px 0;"><div class="arrow-down">↓</div><div class="arrow-label">Stock confirmed</div></div>
+    <div class="flow-row">
+      <div class="node node-purple">Inventory → RESERVED</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-green">Pick Tasks Generated<br/>per order line</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-teal">Order Status: CREATED<br/>→ PICKING_IN_PROGRESS</div>
+    </div>
+  </div>
+
+  <h3>7.2 Trolley Assignment</h3>
+  <div class="info-box blue">
+    <div class="info-title">Trolley &amp; Compartment System</div>
+    Physical trolleys are registered in the system with unique barcodes. Each trolley has multiple
+    compartments (rack slots). Before picking, a specific compartment is assigned to a sales order.
+    This ensures picked items for different orders are kept separate on the same trolley.
+  </div>
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Trolley Assignment</div>
+    <div class="flow-row">
+      <div class="node node-indigo">Supervisor assigns<br/>trolley compartment<br/>to order</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-teal">POST /api/trolleys/assign<br/>(trolleyBarcode +<br/>compartmentBarcode + orderId)</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-green">Compartment linked<br/>to Sales Order</div>
+    </div>
+  </div>
+
+  <h3>7.3 Picking (Barcode Scan)</h3>
+  <div class="step-list">
+    <div class="step-item no-break">
+      <div class="step-num">1</div>
+      <div class="step-content">
+        <div class="step-title">Start Picking Session</div>
+        <div class="step-desc">Picker starts session via POST /api/picking/start with order ID. System returns the pick task list with bin locations.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num">2</div>
+      <div class="step-content">
+        <div class="step-title">Navigate to Bin</div>
+        <div class="step-desc">Picker follows task list to the bin location. The app shows bin barcode, SKU, and quantity needed.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num">3</div>
+      <div class="step-content">
+        <div class="step-title">Scan Item Barcode</div>
+        <div class="step-desc">Picker scans the item barcode. System validates it matches the required SKU for the task.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num">4</div>
+      <div class="step-content">
+        <div class="step-title">Confirm Pick</div>
+        <div class="step-desc">Pick task → DONE. Inventory state → PICKED. Progress bar updates. Next task shown.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num">5</div>
+      <div class="step-content">
+        <div class="step-title">All Tasks Complete</div>
+        <div class="step-desc">Order status → PICKED. Items now on trolley, ready for packing station.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>7.4 Packing Verification</h3>
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Packing Station Flow</div>
+    <div class="flow-row">
+      <div class="node node-blue">Packer at station<br/>scans trolley barcode +<br/>compartment barcode</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-amber">System returns<br/>Packing Manifest<br/>(all items to pack)</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-indigo">Packer scans each<br/>item one-by-one</div>
+    </div>
+    <div style="text-align:center; margin:6px 0;"><div class="arrow-down">↓</div><div class="arrow-label">All items scanned</div></div>
+    <div class="flow-row">
+      <div class="node node-green">Inventory → PACKED</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-teal">Order → PACKED status</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-purple">Ready for Shipping confirmation</div>
+    </div>
+  </div>
+
+  <h3>7.5 Shipping Confirmation</h3>
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Shipment Dispatch</div>
+    <div class="flow-row">
+      <div class="node node-teal">Supervisor confirms<br/>shipment dispatch</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-amber">POST /api/shipping/confirm<br/>with carrier + tracking</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-dark">Shipment Record<br/>created</div>
+    </div>
+    <div style="text-align:center; margin:6px 0;"><div class="arrow-down">↓</div></div>
+    <div class="flow-row">
+      <div class="node node-blue">Inventory → SHIPPED<br/>removed from bin</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-green">Order → SHIPPED</div>
+      <div class="arrow-right">→</div>
+      <div class="node node-purple">Dashboard KPIs<br/>updated</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 8 – END-TO-END FLOW -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">8.</span> End-to-End Warehouse Operations Flow</div>
+  <p class="section-intro">
+    The following diagram shows the complete lifecycle of goods from supplier arrival to customer dispatch.
+  </p>
+
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Complete Warehouse Operations — End to End</div>
+
+    <!-- Row 1: INBOUND -->
+    <div style="background:#eff6ff;border-radius:8px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:8.5pt;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Phase 1 — Inbound</div>
+      <div class="flow-row">
+        <div class="node node-blue">Supplier Delivers<br/>Goods</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-blue">Open Purchase Order<br/>Selected</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-blue">Quantities Received<br/>&amp; Recorded</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-blue node-round"><strong>GRN Created</strong></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin:4px 0;">
+      <div class="arrow-down" style="font-size:18pt;">↓</div>
+    </div>
+
+    <!-- Row 2: PUTAWAY -->
+    <div style="background:#f0fdf4;border-radius:8px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:8.5pt;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Phase 2 — Putaway</div>
+      <div class="flow-row">
+        <div class="node node-green">Putaway Tasks<br/>Auto-Generated</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-green">Operator Scans<br/>Item Barcode</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-green">Operator Scans<br/>Bin Barcode</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-green node-round"><strong>Stock AVAILABLE</strong></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin:4px 0;">
+      <div class="arrow-down" style="font-size:18pt;">↓</div>
+    </div>
+
+    <!-- Row 3: ORDER + PICKING -->
+    <div style="background:#faf5ff;border-radius:8px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:8.5pt;font-weight:700;color:#5b21b6;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Phase 3 — Order &amp; Picking</div>
+      <div class="flow-row">
+        <div class="node node-purple">Sales Order<br/>Created</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-purple">Stock Reserved +<br/>Pick Tasks Created</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-purple">Trolley Compartment<br/>Assigned to Order</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-purple">Picker Scans<br/>Items to Trolley</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-purple node-round"><strong>Order PICKED</strong></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin:4px 0;">
+      <div class="arrow-down" style="font-size:18pt;">↓</div>
+    </div>
+
+    <!-- Row 4: PACKING -->
+    <div style="background:#f0fdfa;border-radius:8px;padding:14px;margin-bottom:10px;">
+      <div style="font-size:8.5pt;font-weight:700;color:#0f5346;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Phase 4 — Packing</div>
+      <div class="flow-row">
+        <div class="node node-teal">Packer Scans<br/>Trolley</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-teal">Packing Manifest<br/>Loaded</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-teal">All Items Scanned<br/>&amp; Verified</div>
+        <div class="arrow-right">→</div>
+        <div class="node node-teal node-round"><strong>Order PACKED</strong></div>
+      </div>
+    </div>
+
+    <div style="text-align:center;margin:4px 0;">
+      <div class="arrow-down" style="font-size:18pt;">↓</div>
+    </div>
+
+    <!-- Row 5: SHIPPING -->
+    <div style="background:#1e293b;border-radius:8px;padding:14px;margin-bottom:4px;">
+      <div style="font-size:8.5pt;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px;">Phase 5 — Shipping</div>
+      <div class="flow-row">
+        <div class="node" style="background:#334155;color:#e2e8f0;border-color:#475569;">Shipment Record<br/>Created</div>
+        <div class="arrow-right" style="color:#64748b;">→</div>
+        <div class="node" style="background:#334155;color:#e2e8f0;border-color:#475569;">Carrier &amp; Tracking<br/>Number Recorded</div>
+        <div class="arrow-right" style="color:#64748b;">→</div>
+        <div class="node" style="background:#334155;color:#e2e8f0;border-color:#475569;">Inventory Removed<br/>from Bin</div>
+        <div class="arrow-right" style="color:#64748b;">→</div>
+        <div class="node node-round" style="background:#e94560;color:#fff;border-color:#e94560;"><strong>ORDER SHIPPED ✓</strong></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 9 – DASHBOARD & REPORTS -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">9.</span> Dashboard &amp; Reporting</div>
+  <p class="section-intro">
+    The management dashboard provides live operational visibility. KPI cards, charts, and an
+    event feed update automatically. Reports provide exportable data for analysis.
+  </p>
+
+  <h3>Dashboard KPIs</h3>
+  <div class="card-grid" style="grid-template-columns: repeat(3, 1fr);">
+    <div class="card blue no-break">
+      <div class="card-icon">📦</div>
+      <div class="card-title">Total SKUs</div>
+      <div class="card-desc">Total product catalog entries in the system.</div>
+    </div>
+    <div class="card green no-break">
+      <div class="card-icon">🏗️</div>
+      <div class="card-title">Bin Utilization %</div>
+      <div class="card-desc">Occupied volume ÷ total bin capacity across all bins.</div>
+    </div>
+    <div class="card amber no-break">
+      <div class="card-icon">🛒</div>
+      <div class="card-title">Open Orders</div>
+      <div class="card-desc">Orders not yet shipped or cancelled.</div>
+    </div>
+    <div class="card purple no-break">
+      <div class="card-icon">⚡</div>
+      <div class="card-title">Pending Picks</div>
+      <div class="card-desc">Pick tasks in PENDING status across all orders.</div>
+    </div>
+    <div class="card teal no-break">
+      <div class="card-icon">📈</div>
+      <div class="card-title">Today's Shipments</div>
+      <div class="card-desc">Orders dispatched today vs. 7-day trend.</div>
+    </div>
+    <div class="card indigo no-break">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Inventory Mix</div>
+      <div class="card-desc">Pie chart — stock distribution by state (AVAILABLE, RESERVED, PICKED, etc.)</div>
+    </div>
+  </div>
+
+  <h3>Charts &amp; Visual Reports</h3>
+  <table>
+    <tr><th>Chart / Report</th><th>Description</th></tr>
+    <tr><td>Shipment Volume Trend</td><td>Area/bar chart — daily shipments over last 7/14/30 days</td></tr>
+    <tr><td>Inventory by State</td><td>Pie chart — real-time stock state distribution</td></tr>
+    <tr><td>Operations Pulse</td><td>Pending putaways, pending picks, attention queue</td></tr>
+    <tr><td>Live Event Feed</td><td>Real-time timeline of recent warehouse events</td></tr>
+    <tr><td>Attention Queue</td><td>Items needing operator action (overdue tasks, etc.)</td></tr>
+  </table>
+
+  <h3>Operational Reports (Export)</h3>
+  <div class="info-box green">
+    <div class="info-title">Excel Export Support</div>
+    Pick task lists, inventory snapshots, and order summaries can be exported to Excel (.xlsx)
+    directly from the frontend using the built-in export function. Reports show SKU, bin, quantity,
+    state, and timestamps.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 10 – USERS, ROLES & PERMISSIONS -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">10.</span> Users, Roles &amp; Permissions</div>
+  <p class="section-intro">
+    WMS Pro uses a fully flexible Role-Based Access Control system. Admins create roles,
+    assign granular permission codes to each role, and assign roles to users.
+    All API endpoints enforce these permissions on every request.
+  </p>
+
+  <h3>Suggested Role Structure</h3>
+  <table>
+    <tr><th>Role</th><th>Typical Permissions</th><th>Scope</th></tr>
+    <tr>
+      <td><strong>Admin</strong></td>
+      <td>
+        <span class="badge badge-blue">ALL</span>
+      </td>
+      <td>Full system access including user management, master data, all operations</td>
+    </tr>
+    <tr>
+      <td><strong>Warehouse Manager</strong></td>
+      <td>
+        <span class="badge badge-green">MASTER_VIEW</span>
+        <span class="badge badge-green">INBOUND_VIEW</span>
+        <span class="badge badge-green">INBOUND_RECEIVE</span>
+        <span class="badge badge-amber">ORDERS_CREATE</span>
+        <span class="badge badge-purple">REPORTS_VIEW</span>
+        <span class="badge badge-blue">DASHBOARD_VIEW</span>
+      </td>
+      <td>All operational views + create orders + reports</td>
+    </tr>
+    <tr>
+      <td><strong>Supervisor</strong></td>
+      <td>
+        <span class="badge badge-green">INBOUND_VIEW</span>
+        <span class="badge badge-amber">PUTAWAY_VIEW</span>
+        <span class="badge badge-purple">ORDERS_VIEW</span>
+        <span class="badge badge-blue">PICKING_VIEW</span>
+        <span class="badge badge-green">PACKING_VIEW</span>
+        <span class="badge badge-amber">SHIPPING_VIEW</span>
+      </td>
+      <td>Can view and execute all operational modules</td>
+    </tr>
+    <tr>
+      <td><strong>Picker</strong></td>
+      <td>
+        <span class="badge badge-blue">PICKING_VIEW</span>
+        <span class="badge badge-green">TROLLEYS_VIEW</span>
+      </td>
+      <td>Pick tasks and trolley compartments only</td>
+    </tr>
+    <tr>
+      <td><strong>Packer</strong></td>
+      <td>
+        <span class="badge badge-blue">PACKING_VIEW</span>
+      </td>
+      <td>Packing station screen only</td>
+    </tr>
+    <tr>
+      <td><strong>Receiver</strong></td>
+      <td>
+        <span class="badge badge-green">INBOUND_VIEW</span>
+        <span class="badge badge-green">INBOUND_RECEIVE</span>
+        <span class="badge badge-amber">PUTAWAY_VIEW</span>
+      </td>
+      <td>Inbound receiving and putaway execution</td>
+    </tr>
+  </table>
+
+  <h3>Full Permission Code Reference</h3>
+  <table>
+    <tr><th>Module</th><th>Permission Codes</th></tr>
+    <tr><td>Dashboard</td><td><span class="badge badge-blue">DASHBOARD_VIEW</span></td></tr>
+    <tr><td>Master Data</td><td><span class="badge badge-blue">MASTER_VIEW</span> <span class="badge badge-amber">MASTER_MANAGE</span></td></tr>
+    <tr><td>Inbound</td><td><span class="badge badge-blue">INBOUND_VIEW</span> <span class="badge badge-green">INBOUND_RECEIVE</span></td></tr>
+    <tr><td>Putaway</td><td><span class="badge badge-blue">PUTAWAY_VIEW</span></td></tr>
+    <tr><td>Inventory</td><td><span class="badge badge-blue">INVENTORY_VIEW</span> <span class="badge badge-amber">INVENTORY_ADJUST</span></td></tr>
+    <tr><td>Orders</td><td><span class="badge badge-blue">ORDERS_VIEW</span> <span class="badge badge-green">ORDERS_CREATE</span></td></tr>
+    <tr><td>Picking</td><td><span class="badge badge-blue">PICKING_VIEW</span></td></tr>
+    <tr><td>Trolleys</td><td><span class="badge badge-blue">TROLLEYS_VIEW</span></td></tr>
+    <tr><td>Packing</td><td><span class="badge badge-blue">PACKING_VIEW</span></td></tr>
+    <tr><td>Shipping</td><td><span class="badge badge-blue">SHIPPING_VIEW</span></td></tr>
+    <tr><td>Reports</td><td><span class="badge badge-blue">REPORTS_VIEW</span></td></tr>
+    <tr><td>Users</td><td><span class="badge badge-blue">USERS_VIEW</span> <span class="badge badge-red">USERS_MANAGE</span></td></tr>
+    <tr><td>Labels</td><td><span class="badge badge-blue">LABELS_VIEW</span> <span class="badge badge-amber">LABELS_PRINT</span></td></tr>
+  </table>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 11 – ADMIN CONTROL FLOW -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">11.</span> Admin Control Flow</div>
+  <p class="section-intro">
+    The Admin has full control over the system — from configuring the physical warehouse layout
+    to managing user access. This section illustrates the administrative setup and governance flow.
+  </p>
+
+  <div class="flow-wrapper no-break">
+    <div class="flow-title">Admin Setup &amp; Governance Flow</div>
+
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+      <!-- LEFT: Master Data -->
+      <div>
+        <div style="font-size:9pt;font-weight:700;color:#0f3460;margin-bottom:10px;text-align:center;">⚙️ Master Data Configuration</div>
+        <div class="flow-col">
+          <div class="node node-dark" style="width:100%;max-width:220px;">Admin Login</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-blue" style="width:100%;max-width:220px;">Create Warehouse(s)</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-blue" style="width:100%;max-width:220px;">Define Zones</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-indigo" style="width:100%;max-width:220px;">Add Aisles per Zone</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-amber" style="width:100%;max-width:220px;">Create Racks per Aisle</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-green" style="width:100%;max-width:220px;">Register Bins<br/>(barcode + dimensions)</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-purple" style="width:100%;max-width:220px;">Add SKU Catalog</div>
+        </div>
+      </div>
+
+      <!-- RIGHT: User Management -->
+      <div>
+        <div style="font-size:9pt;font-weight:700;color:#0f3460;margin-bottom:10px;text-align:center;">👥 User &amp; Role Management</div>
+        <div class="flow-col">
+          <div class="node node-dark" style="width:100%;max-width:220px;">Admin Login</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-teal" style="width:100%;max-width:220px;">Create Roles<br/>(e.g., Picker, Supervisor)</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-teal" style="width:100%;max-width:220px;">Assign Permission<br/>Codes to Role</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-indigo" style="width:100%;max-width:220px;">Create Users<br/>(username + password)</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-indigo" style="width:100%;max-width:220px;">Assign Role to User</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-green" style="width:100%;max-width:220px;">User can login &amp;<br/>access permitted modules</div>
+          <div class="arrow-down">↓</div>
+          <div class="node node-purple" style="width:100%;max-width:220px;">All actions logged<br/>in audit trail</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Label Printing</h3>
+  <div class="info-box blue">
+    <div class="info-title">Barcode Label Generation</div>
+    The Labels module allows admin and supervisors to generate and print barcode labels for
+    bins, SKUs, and trolley compartments. Labels include barcode, text, and location information —
+    used for scan-based operations throughout the warehouse floor.
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SECTION 12 – MODULE SUMMARY & BENEFITS -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="section-container page-break">
+  <div class="section-title"><span class="section-number">12.</span> Module Summary &amp; Business Benefits</div>
+
+  <h3>Complete Module Reference</h3>
+  <table>
+    <tr><th>#</th><th>Module</th><th>Frontend Page</th><th>API Endpoint</th><th>Key Function</th></tr>
+    <tr><td>1</td><td>Authentication</td><td>/login</td><td>/api/auth</td><td>JWT login, token issuance</td></tr>
+    <tr><td>2</td><td>Dashboard</td><td>/dashboard</td><td>/api/dashboard</td><td>KPIs, charts, live feed</td></tr>
+    <tr><td>3</td><td>Master Data</td><td>/master</td><td>/api/master</td><td>Warehouse, Zone, Aisle, Rack, Bin</td></tr>
+    <tr><td>4</td><td>Purchase Orders</td><td>/inbound</td><td>/api/purchase-orders</td><td>PO registration &amp; tracking</td></tr>
+    <tr><td>5</td><td>Inbound / GRN</td><td>/inbound</td><td>/api/inbound</td><td>Goods receipt, GRN creation</td></tr>
+    <tr><td>6</td><td>Putaway</td><td>/putaway</td><td>/api/putaway</td><td>Task generation, bin scan execution</td></tr>
+    <tr><td>7</td><td>Inventory</td><td>/inventory</td><td>/api/inventory</td><td>Live stock ledger, adjustments</td></tr>
+    <tr><td>8</td><td>Sales Orders</td><td>/orders</td><td>/api/orders</td><td>Order creation, pick task generation</td></tr>
+    <tr><td>9</td><td>Trolleys</td><td>/trolleys</td><td>/api/trolleys</td><td>Trolley &amp; compartment management</td></tr>
+    <tr><td>10</td><td>Picking</td><td>/picking</td><td>/api/picking</td><td>Pick session, barcode scan</td></tr>
+    <tr><td>11</td><td>Packing</td><td>/packing</td><td>/api/packing</td><td>Pack verification by scan</td></tr>
+    <tr><td>12</td><td>Shipping</td><td>/shipping</td><td>/api/shipping</td><td>Shipment confirmation, tracking</td></tr>
+    <tr><td>13</td><td>Reports</td><td>/reports</td><td>/api/reports</td><td>KPI reports, inventory by state</td></tr>
+    <tr><td>14</td><td>Labels</td><td>/labels</td><td>—</td><td>Barcode label generation &amp; print</td></tr>
+    <tr><td>15</td><td>Users</td><td>/users</td><td>/api/users</td><td>User CRUD management</td></tr>
+    <tr><td>16</td><td>Roles</td><td>/roles</td><td>/api/roles</td><td>Role &amp; permission management</td></tr>
+    <tr><td>17</td><td>Settings</td><td>/settings</td><td>—</td><td>System configuration &amp; preferences</td></tr>
+    <tr><td>18</td><td>AI Assistant</td><td>—</td><td>/api/ai</td><td>Optional AI chat for warehouse queries</td></tr>
+  </table>
+
+  <h3>Key Business Benefits</h3>
+  <div class="step-list">
+    <div class="step-item no-break">
+      <div class="step-num" style="background:#166534;">✓</div>
+      <div class="step-content">
+        <div class="step-title">Zero Mislocation Errors</div>
+        <div class="step-desc">Dual-scan verification (item + bin) during putaway and picking prevents stock being placed or picked from wrong locations.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num" style="background:#1d4ed8;">✓</div>
+      <div class="step-content">
+        <div class="step-title">Real-Time Inventory Accuracy</div>
+        <div class="step-desc">Every scan updates stock state and bin occupancy instantly. No overnight batch updates — managers always see live data.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num" style="background:#7c3aed;">✓</div>
+      <div class="step-content">
+        <div class="step-title">Faster Order Fulfillment</div>
+        <div class="step-desc">Auto-generated pick tasks with optimized bin paths, trolley assignment, and packing manifests reduce order cycle time.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num" style="background:#b45309;">✓</div>
+      <div class="step-content">
+        <div class="step-title">Complete Audit Trail</div>
+        <div class="step-desc">Every user action is tied to a user account. Movement logs track all stock transitions. Management can investigate any discrepancy.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num" style="background:#0f766e;">✓</div>
+      <div class="step-content">
+        <div class="step-title">Flexible Role-Based Access</div>
+        <div class="step-desc">Granular permission codes mean operators only see what they need to. Sensitive functions (user management, adjustments) are admin-only.</div>
+      </div>
+    </div>
+    <div class="step-item no-break">
+      <div class="step-num" style="background:#be185d;">✓</div>
+      <div class="step-content">
+        <div class="step-title">Scalable Architecture</div>
+        <div class="step-desc">Spring Boot REST + Next.js frontend can scale horizontally. MySQL handles large transaction volumes. New modules can be added without disrupting existing flows.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- FOOTER -->
+<!-- ═══════════════════════════════════════════════════════ -->
+<div class="doc-footer">
+  <div style="font-size:9pt;color:#475569;margin-bottom:6px;">
+    <strong>WMS Pro</strong> — Warehouse Management System Client Document
+  </div>
+  <div>Version 1.0.0 &nbsp;|&nbsp; Prepared: April 4, 2026 &nbsp;|&nbsp; Confidential — For Client Use Only</div>
+  <div style="margin-top:8px;">
+    Built on: Next.js 14 · Spring Boot 3 · Java 17 · MySQL 8 · JWT Security
+  </div>
+</div>
+
+</body>
+</html>

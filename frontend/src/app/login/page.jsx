@@ -6,7 +6,8 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Layers3, Loader2, LockKeyhole, UserRound, Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
+import { Layers3, Loader2, LockKeyhole, UserRound, Eye, EyeOff, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -89,6 +90,15 @@ export default function LoginPage() {
               </div>
             ))}
           </div>
+          <div className="mt-4 pt-4 border-t border-border/40">
+            <Link
+              href="/guide"
+              className="inline-flex items-center gap-2 rounded-xl border border-border/60 bg-background/30 px-4 py-2.5 text-sm font-medium text-muted-foreground transition-all hover:bg-background/60 hover:text-foreground hover:border-border"
+            >
+              <BookOpen className="size-4" />
+              Read the How-to-Use Guide →
+            </Link>
+          </div>
         </div>
 
         <Card className="glass-card rounded-[2rem] border-none py-6 shadow-2xl">
@@ -144,6 +154,16 @@ export default function LoginPage() {
                 {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
                 Continue to dashboard
               </Button>
+
+              <div className="text-center">
+                <Link
+                  href="/guide"
+                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-primary transition-colors"
+                >
+                  <BookOpen className="size-3.5" />
+                  New here? Read the how-to-use guide
+                </Link>
+              </div>
 
               <div className="space-y-2 rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between">

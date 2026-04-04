@@ -1,17 +1,37 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 
-const PUBLIC_ROUTES = ['/login'];
+const PUBLIC_ROUTES = ['/login', '/guide'];
 
 export default function AppShellClient({ children }) {
   const pathname = usePathname();
   const router = useRouter();
   const isPublicRoute = PUBLIC_ROUTES.includes(pathname);
+  const [isAuthorized, setIsAuthorized] = useState(isPublicRoute);
+
+  useEffect(() => {
+    if (isPublicRoute) {
+      setIsAuthorized(true);
+      return;
+    }
+
+    const token = localStorage.getItem('wms_token');
+    if (!token) {
+      setIsAuthorized(false);
+      router.replace('/login');
+      return;
+    }
+
+    setIsAuthorized(true);
+  }, [isPublicRoute, router, pathname]);
 
   if (isPublicRoute) return <>{children}</>;
+
+  if (!isAuthorized) return null;
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
