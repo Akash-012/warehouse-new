@@ -47,6 +47,13 @@ public class OrdersController {
         return ResponseEntity.ok(salesOrderService.getOrder(id));
     }
 
+    @PatchMapping("/{id}/cancel")
+    @PreAuthorize("hasAuthority('ORDERS_CREATE')")
+    public ResponseEntity<Void> cancel(@PathVariable Long id) {
+        salesOrderService.cancelOrder(id);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/{id}/pick-tasks")
     public ResponseEntity<List<PickTaskResponse>> pickTasks(@PathVariable Long id) {
         return ResponseEntity.ok(salesOrderService.getOrderPickTasks(id));

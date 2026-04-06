@@ -101,6 +101,33 @@ public class SalesOrderService {
                 .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + orderId));
     }
 
+    @Transactional
+    public void cancelOrder(Long orderId) {
+        SalesOrder order = salesOrderRepository.findById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + orderId));
+
+        if (List.of("SHIPPED", "CANCELLED").contains(order.getStatus())) {
+            throw new IllegalStateException("Cannot cancel order in status: " + order.getStatus());
+        }
+
+        // Release reserved inventory back to AVAILABLE and cancel pick tasks
+        List<PickTask> tasks = pickTaskRepository.findBySalesOrderLineSalesOrderId(orderId);
+        for (PickTask task : tasks) {
+            if ("PENDING".equals(task.getStatus())) {
+                task.setStatus("CANCELLED");
+                pickTaskRepository.save(task);
+                Inventory inv = task.getInventory();
+                if (inv != null && Inventory.InventoryState.RESERVED.equals(inv.getState())) {
+                    inv.setState(Inventory.InventoryState.AVAILABLE);
+                    inventoryRepository.save(inv);
+                }
+            }
+        }
+
+        order.setStatus("CANCELLED");
+        salesOrderRepository.save(order);
+    }
+
     public List<PickTaskResponse> getOrderPickTasks(Long orderId) {
         return pickTaskRepository.findBySalesOrderLineSalesOrderId(orderId).stream()
                 .map(task -> PickTaskResponse.builder()

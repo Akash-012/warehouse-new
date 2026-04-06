@@ -41,7 +41,7 @@ const orderSchema = z.object({
   })),
 });
 
-const STATUS_TABS = ['ALL', 'OPEN', 'RESERVED', 'PICKED', 'PACKED', 'SHIPPED', 'CANCELLED'];
+const STATUS_TABS = ['ALL', 'PENDING', 'OPEN', 'RESERVED', 'PICKED', 'PACKED', 'SHIPPED', 'CANCELLED'];
 
 async function exportOrdersToExcel(orders) {
   await exportWmsWorkbook({
