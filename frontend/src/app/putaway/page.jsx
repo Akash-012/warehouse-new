@@ -71,12 +71,18 @@ async function exportTasksExcel(tasks) {
       { header: 'Item Barcode', key: 'itemBarcode', width: 24 },
       { header: 'Suggested Bin', key: 'suggestedBin', width: 18 },
       { header: 'SKU', key: 'skuCode', width: 16 },
+      { header: 'SKU Name', key: 'skuName', width: 28 },
+      { header: 'GRN No', key: 'grnNo', width: 18 },
+      { header: 'PO Number', key: 'poNumber', width: 18 },
     ],
     rows: tasks.map((t) => ({
       priority: t.priority === 1 ? 'HIGH' : t.priority === 2 ? 'MEDIUM' : 'LOW',
       itemBarcode: t.itemBarcode ?? t.inventoryBarcode ?? '',
-      suggestedBin: t.suggestedBin ?? t.suggestedBinBarcode ?? '',
+      suggestedBin: t.suggestedBinBarcode ?? t.suggestedBin ?? '',
       skuCode: t.skuCode ?? '',
+      skuName: t.skuName ?? '',
+      grnNo: t.grnNo ?? '',
+      poNumber: t.poNumber ?? '',
     })),
   });
   toast.success('Putaway tasks exported to Excel');
@@ -136,8 +142,11 @@ export default function PutawayPage() {
       list = list.filter(
         (t) =>
           (t.itemBarcode ?? t.inventoryBarcode ?? '').toLowerCase().includes(q) ||
-          (t.suggestedBin ?? t.suggestedBinBarcode ?? '').toLowerCase().includes(q) ||
-          (t.skuCode ?? '').toLowerCase().includes(q),
+          (t.suggestedBinBarcode ?? t.suggestedBin ?? '').toLowerCase().includes(q) ||
+          (t.skuCode ?? '').toLowerCase().includes(q) ||
+          (t.skuName ?? '').toLowerCase().includes(q) ||
+          (t.grnNo ?? '').toLowerCase().includes(q) ||
+          (t.poNumber ?? '').toLowerCase().includes(q),
       );
     }
     return list;
@@ -222,6 +231,7 @@ export default function PutawayPage() {
                     <TableHead>Item Barcode</TableHead>
                     <TableHead>Suggested Bin</TableHead>
                     <TableHead>SKU</TableHead>
+                    <TableHead>SKU Name</TableHead>
                     <TableHead className="pr-6">GRN / PO Ref</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -241,20 +251,21 @@ export default function PutawayPage() {
                           <PriorityBadge priority={task.priority} />
                         </TableCell>
                         <TableCell className="font-mono text-xs">
-                          {task.itemBarcode ?? task.inventoryBarcode}
+                          {task.itemBarcode ?? task.inventoryBarcode ?? '—'}
                         </TableCell>
                         <TableCell className="font-mono text-sm font-medium text-primary">
-                          {task.suggestedBin ?? task.suggestedBinBarcode}
+                          {task.suggestedBinBarcode ?? task.suggestedBin ?? '—'}
                         </TableCell>
-                        <TableCell>{task.skuCode ?? '—'}</TableCell>
+                        <TableCell className="font-semibold">{task.skuCode ?? '—'}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground">{task.skuName ?? '—'}</TableCell>
                         <TableCell className="pr-6 text-xs text-muted-foreground font-mono">
-                          {task.grnNo ?? task.poNumber ?? '—'}
+                          {task.grnNo ? `GRN: ${task.grnNo}` : task.poNumber ? `PO: ${task.poNumber}` : '—'}
                         </TableCell>
                       </TableRow>
                     ))
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={4} className="h-40 text-center text-muted-foreground">
+                      <TableCell colSpan={6} className="h-40 text-center text-muted-foreground">
                         <CheckCircle2 className="mx-auto mb-3 size-8 text-emerald-500/70" />
                         {tasks?.length
                           ? 'No tasks match the current filter.'

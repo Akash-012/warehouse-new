@@ -12,4 +12,8 @@ public class PutawayTaskResponse {
     String suggestedBinBarcode;
     Integer priority;
     String state;
+    String skuCode;
+    String skuName;
+    String grnNo;
+    String poNumber;
 }

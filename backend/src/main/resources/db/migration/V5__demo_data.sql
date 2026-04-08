@@ -109,7 +109,10 @@ INSERT INTO sku_dimension (id, sku_id, length_cm, width_cm, height_cm, weight_g)
 INSERT INTO purchase_order (id, po_number, supplier, expected_arrival_date, status) VALUES
   (1, 'PO-2026-001', 'TechSupply Co.',       '2026-03-10', 'RECEIVED'),
   (2, 'PO-2026-002', 'Digital Imports Ltd.', '2026-03-18', 'IN_RECEIVING'),
-  (3, 'PO-2026-003', 'Gadget World',         '2026-03-25', 'PENDING');
+  (3, 'PO-2026-003', 'Gadget World',         '2026-03-25', 'PENDING'),
+  (4, 'PO-2026-004', 'Office Essentials',    '2026-04-01', 'PENDING'),
+  (5, 'PO-2026-005', 'Storage Solutions',    '2026-04-05', 'PENDING'),
+  (6, 'PO-2026-006', 'Peripheral Hub',       '2026-04-10', 'PENDING');
 
 INSERT INTO purchase_order_line (id, purchase_order_id, sku_id, quantity) VALUES
   -- PO-001: SKU 1,2,3 – 10 units each
@@ -117,7 +120,13 @@ INSERT INTO purchase_order_line (id, purchase_order_id, sku_id, quantity) VALUES
   -- PO-002: SKU 4,5 – 5 units each
   (4, 2, 4,  5), (5, 2, 5,  5),
   -- PO-003: SKU 6,7,8 – 8 units each
-  (6, 3, 6,  8), (7, 3, 7,  8), (8, 3, 8,  8);
+  (6, 3, 6,  8), (7, 3, 7,  8), (8, 3, 8,  8),
+  -- PO-004: SKU 9,10 – 6 units each (PENDING – ready to receive)
+  (9, 4, 9,  6), (10, 4, 10, 6),
+  -- PO-005: SKU 1,3 – 8 units each (PENDING)
+  (11, 5, 1,  8), (12, 5, 3,  8),
+  -- PO-006: SKU 2,4 – 5 units each (PENDING)
+  (13, 6, 2,  5), (14, 6, 4,  5);
 
 -- ─────────────────────────────────────────
 -- 4. GOODS RECEIPTS  (for PO-001 and PO-002)
@@ -183,13 +192,13 @@ INSERT INTO inventory (id, sku_id, bin_id, batch_no, serial_no, quantity, state,
   (29, 3, 29, 'BATCH-HD-2603', 'SN-HD-0009', 1, 'AVAILABLE', 3),
   (30, 3, 30, 'BATCH-HD-2603', 'SN-HD-0010', 1, 'AVAILABLE', 3);
 
--- SKU4 (laptop stand) – 5 units, 3 AVAILABLE, 2 IN_PUTAWAY
+-- SKU4 (laptop stand) – 5 units AVAILABLE
 INSERT INTO inventory (id, sku_id, bin_id, batch_no, serial_no, quantity, state, goods_receipt_line_id) VALUES
-  (31, 4, 31, 'BATCH-LS-2618', 'SN-LS-0001', 1, 'AVAILABLE',  4),
-  (32, 4, 32, 'BATCH-LS-2618', 'SN-LS-0002', 1, 'AVAILABLE',  4),
-  (33, 4, 33, 'BATCH-LS-2618', 'SN-LS-0003', 1, 'AVAILABLE',  4),
-  (34, 4, NULL,'BATCH-LS-2618', 'SN-LS-0004', 1, 'IN_PUTAWAY', 4),
-  (35, 4, NULL,'BATCH-LS-2618', 'SN-LS-0005', 1, 'IN_PUTAWAY', 4);
+  (31, 4, 31, 'BATCH-LS-2618', 'SN-LS-0001', 1, 'AVAILABLE', 4),
+  (32, 4, 32, 'BATCH-LS-2618', 'SN-LS-0002', 1, 'AVAILABLE', 4),
+  (33, 4, 33, 'BATCH-LS-2618', 'SN-LS-0003', 1, 'AVAILABLE', 4),
+  (34, 4, 34, 'BATCH-LS-2618', 'SN-LS-0004', 1, 'AVAILABLE', 4),
+  (35, 4, 35, 'BATCH-LS-2618', 'SN-LS-0005', 1, 'AVAILABLE', 4);
 
 -- SKU5 (monitor) – 5 units AVAILABLE in bins 34-38
 INSERT INTO inventory (id, sku_id, bin_id, batch_no, serial_no, quantity, state, goods_receipt_line_id) VALUES
@@ -219,13 +228,6 @@ INSERT INTO inventory (id, sku_id, bin_id, batch_no, serial_no, quantity, state,
   (50, 9,  2,  'BATCH-RM-ONHAND', 'SN-RM-0002', 1, 'AVAILABLE', NULL),
   (51, 10, 3,  'BATCH-PB-ONHAND', 'SN-PB-0001', 1, 'AVAILABLE', NULL),
   (52, 10, 4,  'BATCH-PB-ONHAND', 'SN-PB-0002', 1, 'AVAILABLE', NULL);
-
--- ─────────────────────────────────────────
--- 6. PUTAWAY TASKS  (for IN_PUTAWAY inventory items 34-35)
--- ─────────────────────────────────────────
-INSERT INTO putaway_task (id, inventory_id, suggested_bin_id, status, warehouse_id, priority) VALUES
-  (1, 34, NULL, 'PENDING',   1, 1),
-  (2, 35, NULL, 'PENDING',   1, 2);
 
 -- ─────────────────────────────────────────
 -- 7. TROLLEYS  &  RACK COMPARTMENTS

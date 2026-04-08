@@ -66,13 +66,20 @@ public class PutawayEngineService {
             inventory.setState(Inventory.InventoryState.IN_PUTAWAY);
             inventoryRepository.save(inventory);
 
+            var grl = inventory.getGoodsReceiptLine();
+            var gr  = grl != null ? grl.getGoodsReceipt() : null;
+            var po  = gr  != null ? gr.getPurchaseOrder() : null;
             responses.add(PutawayTaskResponse.builder()
                     .taskId(task.getId())
                     .inventoryId(inventory.getId())
-                    .itemBarcode(inventory.getSerialNo())
+                    .itemBarcode(inventory.getSerialNo() != null ? inventory.getSerialNo() : inventory.getBatchNo())
                     .suggestedBinBarcode(suggested.getBarcode())
                     .priority(task.getPriority())
                     .state(task.getStatus().name())
+                    .skuCode(inventory.getSku().getSkuCode())
+                    .skuName(inventory.getSku().getDescription())
+                    .grnNo(gr  != null ? gr.getGrnNo()    : null)
+                    .poNumber(po != null ? po.getPoNumber() : null)
                     .build());
         }
 

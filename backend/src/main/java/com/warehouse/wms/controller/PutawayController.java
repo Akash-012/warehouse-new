@@ -50,7 +50,29 @@ public class PutawayController {
 
     @Operation(summary = "List pending putaway tasks")
     @GetMapping("/tasks/pending")
-    public ResponseEntity<List<PutawayTask>> pending() {
-        return ResponseEntity.ok(putawayTaskRepository.findByStatusOrderByPriorityAscIdAsc(PutawayTask.PutawayTaskStatus.PENDING));
+    public ResponseEntity<List<PutawayTaskResponse>> pending() {
+        return ResponseEntity.ok(
+            putawayTaskRepository.findByStatusOrderByPriorityAscIdAsc(PutawayTask.PutawayTaskStatus.PENDING)
+                .stream()
+                .map(t -> {
+                        var inv = t.getInventory();
+                        var grl = inv.getGoodsReceiptLine();
+                        var gr  = grl != null ? grl.getGoodsReceipt() : null;
+                        var po  = gr  != null ? gr.getPurchaseOrder() : null;
+                        return PutawayTaskResponse.builder()
+                                .taskId(t.getId())
+                                .inventoryId(inv.getId())
+                                .itemBarcode(inv.getSerialNo() != null ? inv.getSerialNo() : inv.getBatchNo())
+                                .suggestedBinBarcode(t.getSuggestedBin() != null ? t.getSuggestedBin().getBarcode() : null)
+                                .priority(t.getPriority())
+                                .state(t.getStatus().name())
+                                .skuCode(inv.getSku().getSkuCode())
+                                .skuName(inv.getSku().getDescription())
+                                .grnNo(gr  != null ? gr.getGrnNo()    : null)
+                                .poNumber(po != null ? po.getPoNumber() : null)
+                                .build();
+                })
+                .toList()
+        );
     }
 }

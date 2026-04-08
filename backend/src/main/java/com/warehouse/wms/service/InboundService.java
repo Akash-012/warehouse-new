@@ -18,7 +18,10 @@ import com.warehouse.wms.repository.InventoryRepository;
 import com.warehouse.wms.repository.PurchaseOrderLineRepository;
 import com.warehouse.wms.repository.PurchaseOrderRepository;
 import com.warehouse.wms.repository.SkuRepository;
+import com.warehouse.wms.service.PutawayEngineService;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -33,6 +36,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class InboundService {
 
+    private static final Logger log = LoggerFactory.getLogger(InboundService.class);
     private static final String RECEIVE_DOCK_BARCODE = "RECV_DOCK";
 
     private final PurchaseOrderRepository purchaseOrderRepository;
@@ -42,6 +46,7 @@ public class InboundService {
     private final GoodsReceiptLineRepository goodsReceiptLineRepository;
     private final InventoryRepository inventoryRepository;
     private final SkuRepository skuRepository;
+    private final PutawayEngineService putawayEngineService;
 
     @Transactional
     public GRNResponse receivePO(ReceivePORequest request) {
@@ -103,6 +108,12 @@ public class InboundService {
         );
         po.setStatus(fullyReceived ? "RECEIVED" : "PARTIALLY_RECEIVED");
         purchaseOrderRepository.save(po);
+
+        try {
+            putawayEngineService.generatePutawayTasks(saved.getId());
+        } catch (Exception e) {
+            log.warn("Putaway task generation failed for GRN {}: {}", saved.getId(), e.getMessage());
+        }
 
         return toGrnResponse(saved, totalItems);
     }

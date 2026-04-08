@@ -21,4 +21,6 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
            "LEFT JOIN FETCH l.sku " +
            "WHERE p.id = :id")
     Optional<PurchaseOrder> findByIdWithLines(@Param("id") Long id);
+
+    boolean existsByPoNumber(String poNumber);
 }

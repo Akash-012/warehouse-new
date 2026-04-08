@@ -77,6 +77,8 @@ public class DataInitializer implements CommandLineRunner {
         if (warehouseRepository.count() == 0) seedWarehouseStructure();
         if (skuRepository.count() == 0)       seedSkus();
         if (purchaseOrderRepository.count() == 0) seedPurchaseOrders();
+        seedTestPurchaseOrders();
+        clearStalePutawayTasks();
         if (salesOrderRepository.count() == 0)    seedSalesOrdersAndShipments();
         if (inventoryRepository.count() == 0)     seedInventory();
     }
@@ -287,6 +289,109 @@ public class DataInitializer implements CommandLineRunner {
         line.setSku(sku);
         line.setQuantity(qty);
         purchaseOrderLineRepository.save(line);
+    }
+
+    // ── Test Purchase Orders (4 pending for inbound/putaway/inventory testing) ─
+    private void seedTestPurchaseOrders() {
+        List<Sku> skus = skuRepository.findAll();
+        if (skus.size() < 10) return;
+
+        if (!purchaseOrderRepository.existsByPoNumber("PO-TEST-001")) {
+            PurchaseOrder po = new PurchaseOrder();
+            po.setPoNumber("PO-TEST-001");
+            po.setSupplier("Test Supplier A");
+            po.setExpectedArrivalDate(LocalDate.now().plusDays(2));
+            po.setStatus("PENDING");
+            po = purchaseOrderRepository.save(po);
+            savePOLine(po, skus.get(0), 3);  // SKU-001 Laptop 15"
+            savePOLine(po, skus.get(1), 5);  // SKU-002 Wireless Mouse
+            System.out.println("[DataInitializer] Seeded PO-TEST-001");
+        }
+
+        if (!purchaseOrderRepository.existsByPoNumber("PO-TEST-002")) {
+            PurchaseOrder po = new PurchaseOrder();
+            po.setPoNumber("PO-TEST-002");
+            po.setSupplier("Test Supplier B");
+            po.setExpectedArrivalDate(LocalDate.now().plusDays(3));
+            po.setStatus("PENDING");
+            po = purchaseOrderRepository.save(po);
+            savePOLine(po, skus.get(2), 4);  // SKU-003 USB-C Hub
+            savePOLine(po, skus.get(3), 2);  // SKU-004 Mechanical Keyboard
+            System.out.println("[DataInitializer] Seeded PO-TEST-002");
+        }
+
+        if (!purchaseOrderRepository.existsByPoNumber("PO-TEST-003")) {
+            PurchaseOrder po = new PurchaseOrder();
+            po.setPoNumber("PO-TEST-003");
+            po.setSupplier("Test Supplier C");
+            po.setExpectedArrivalDate(LocalDate.now().plusDays(4));
+            po.setStatus("PENDING");
+            po = purchaseOrderRepository.save(po);
+            savePOLine(po, skus.get(5), 6);  // SKU-006 Webcam 1080p
+            savePOLine(po, skus.get(8), 3);  // SKU-009 External SSD 1TB
+            System.out.println("[DataInitializer] Seeded PO-TEST-003");
+        }
+
+        if (!purchaseOrderRepository.existsByPoNumber("PO-TEST-004")) {
+            PurchaseOrder po = new PurchaseOrder();
+            po.setPoNumber("PO-TEST-004");
+            po.setSupplier("Test Supplier D");
+            po.setExpectedArrivalDate(LocalDate.now().plusDays(5));
+            po.setStatus("PENDING");
+            po = purchaseOrderRepository.save(po);
+            savePOLine(po, skus.get(6), 4);  // SKU-007 Headset USB
+            savePOLine(po, skus.get(9), 3);  // SKU-010 Docking Station
+            System.out.println("[DataInitializer] Seeded PO-TEST-004");
+        }
+
+        if (!purchaseOrderRepository.existsByPoNumber("PO-TEST-005")) {
+            PurchaseOrder po = new PurchaseOrder();
+            po.setPoNumber("PO-TEST-005");
+            po.setSupplier("Rapid Electronics Ltd.");
+            po.setExpectedArrivalDate(LocalDate.now().plusDays(6));
+            po.setStatus("PENDING");
+            po = purchaseOrderRepository.save(po);
+            savePOLine(po, skus.get(4), 10); // SKU-005 Monitor 27"
+            savePOLine(po, skus.get(7), 8);  // SKU-008 Laptop Stand
+            savePOLine(po, skus.get(0), 5);  // SKU-001 Laptop 15"
+            System.out.println("[DataInitializer] Seeded PO-TEST-005");
+        }
+
+        if (!purchaseOrderRepository.existsByPoNumber("PO-TEST-006")) {
+            PurchaseOrder po = new PurchaseOrder();
+            po.setPoNumber("PO-TEST-006");
+            po.setSupplier("Prime Components Inc.");
+            po.setExpectedArrivalDate(LocalDate.now().plusDays(7));
+            po.setStatus("PENDING");
+            po = purchaseOrderRepository.save(po);
+            savePOLine(po, skus.get(1), 20); // SKU-002 Wireless Mouse
+            savePOLine(po, skus.get(5), 15); // SKU-006 Webcam 1080p
+            System.out.println("[DataInitializer] Seeded PO-TEST-006");
+        }
+
+        if (!purchaseOrderRepository.existsByPoNumber("PO-TEST-007")) {
+            PurchaseOrder po = new PurchaseOrder();
+            po.setPoNumber("PO-TEST-007");
+            po.setSupplier("Vertex Hardware Co.");
+            po.setExpectedArrivalDate(LocalDate.now().plusDays(8));
+            po.setStatus("PENDING");
+            po = purchaseOrderRepository.save(po);
+            savePOLine(po, skus.get(3), 6);  // SKU-004 Mechanical Keyboard
+            savePOLine(po, skus.get(8), 12); // SKU-009 External SSD 1TB
+            savePOLine(po, skus.get(2), 9);  // SKU-003 USB-C Hub 7-port
+            System.out.println("[DataInitializer] Seeded PO-TEST-007");
+        }
+    }
+
+    // ── Clear stale putaway tasks (orphaned PENDING tasks with no valid inventory) ─
+    private void clearStalePutawayTasks() {
+        jdbc.update("""
+            DELETE pt FROM putaway_task pt
+            JOIN inventory i ON i.id = pt.inventory_id
+            WHERE pt.status = 'PENDING'
+            AND i.state NOT IN ('IN_PUTAWAY', 'RECEIVED')
+            """);
+        System.out.println("[DataInitializer] Cleared stale PENDING putaway tasks");
     }
 
     // ── Sales Orders & Shipments ───────────────────────────────────────────────
