@@ -2,8 +2,8 @@
 export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { toast } from 'sonner';
@@ -22,14 +22,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Truck, Plus, Minus, Search, Inbox, Link2, List } from 'lucide-react';
+import { Truck, Plus, Search, Inbox, Link2, List } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 
 const createSchema = z.object({
   trolleyBarcode: z.string().min(1, 'Trolley barcode is required'),
-  compartmentBarcodes: z
-    .array(z.object({ value: z.string().min(1, 'Required') }))
-    .min(1, 'At least one compartment required'),
+  rackId: z.string().min(1, 'Rack is required'),
+  compartmentCount: z.coerce.number().int().min(1, 'At least 1').max(20, 'Max 20'),
 });
 
 const assignSchema = z.object({
@@ -40,6 +39,7 @@ const assignSchema = z.object({
 export default function TrolleysPage() {
   const [lookupBarcode, setLookupBarcode] = useState('');
   const [compartmentContents, setCompartmentContents] = useState(null);
+  const queryClient = useQueryClient();
 
   // Fetch all trolleys for the list
   const { data: trolleyList, isLoading: listLoading } = useQuery({
@@ -49,18 +49,43 @@ export default function TrolleysPage() {
     retry: false,
   });
 
+  // Fetch racks for compartment barcode generation
+  const { data: racks } = useQuery({
+    queryKey: ['racks-list'],
+    queryFn: () => api.get('/master/racks').then((r) => r.data ?? []),
+    staleTime: 60_000,
+    retry: false,
+  });
+
+  // Build COMP-A1R1-01 barcode from rack + sequence
+  const buildCompartmentBarcode = (rack, seq) => {
+    const aisle = rack?.aisle?.aisleNumber ?? '';
+    const rackPart = (rack?.rackIdentifier ?? '').replace('-', '');
+    return `COMP-${aisle}${rackPart}-${String(seq).padStart(2, '0')}`;
+  };
+
+  // Preview generated barcodes
+  const previewBarcodes = (rackId, count) => {
+    const rack = (racks ?? []).find((r) => String(r.id) === String(rackId));
+    if (!rack || !count) return [];
+    return Array.from({ length: Number(count) }, (_, i) => buildCompartmentBarcode(rack, i + 1));
+  };
+
   const {
     register: regCreate,
     handleSubmit: handleCreate,
     control,
     reset: resetCreate,
+    watch: watchCreate,
     formState: { errors: createErrors },
   } = useForm({
     resolver: zodResolver(createSchema),
-    defaultValues: { trolleyBarcode: '', compartmentBarcodes: [{ value: '' }] },
+    defaultValues: { trolleyBarcode: '', rackId: '', compartmentCount: 1 },
   });
 
-  const { fields, append, remove } = useFieldArray({ control, name: 'compartmentBarcodes' });
+  const watchedRackId = watchCreate('rackId');
+  const watchedCount = watchCreate('compartmentCount');
+  const generatedBarcodes = previewBarcodes(watchedRackId, watchedCount);
 
   const {
     register: regAssign,
@@ -70,15 +95,20 @@ export default function TrolleysPage() {
   } = useForm({ resolver: zodResolver(assignSchema) });
 
   const createMutation = useMutation({
-    mutationFn: (data) =>
-      api
-        .post('/trolleys', {
-          trolleyBarcode: data.trolleyBarcode,
-          compartmentBarcodes: data.compartmentBarcodes.map((c) => c.value),
-        })
-        .then((r) => r.data),
+    mutationFn: (data) => {
+      const rack = (racks ?? []).find((r) => String(r.id) === String(data.rackId));
+      const compartmentBarcodes = Array.from(
+        { length: Number(data.compartmentCount) },
+        (_, i) => buildCompartmentBarcode(rack, i + 1)
+      );
+      return api.post('/trolleys', {
+        trolleyBarcode: data.trolleyBarcode,
+        compartmentBarcodes,
+      }).then((r) => r.data);
+    },
     onSuccess: (data) => {
       toast.success(`Trolley ${data.trolleyIdentifier} created`);
+      queryClient.invalidateQueries({ queryKey: ['trolleys-list'] });
       resetCreate();
     },
     onError: (e) => toast.error(e?.response?.data?.detail ?? 'Failed to create trolley'),
@@ -139,7 +169,16 @@ export default function TrolleysPage() {
                 {trolleyList.map((t) => (
                   <TableRow key={t.id ?? t.barcode} className="table-row-hover">
                     <TableCell className="font-mono text-sm font-medium text-primary">{t.trolleyIdentifier}</TableCell>
-                    <TableCell className="text-sm">{t.compartmentCount ?? t.compartments?.length ?? '—'}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(t.compartments ?? []).length === 0
+                          ? <span className="text-muted-foreground text-xs">—</span>
+                          : (t.compartments ?? []).map((b) => (
+                              <span key={b} className="font-mono text-xs rounded-md bg-primary/10 text-primary px-2 py-0.5">{b}</span>
+                            ))
+                        }
+                      </div>
+                    </TableCell>
                     <TableCell><StatusBadge status={t.status ?? 'IDLE'} /></TableCell>
                   </TableRow>
                 ))}
@@ -176,38 +215,47 @@ export default function TrolleysPage() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label>Compartment Barcodes</Label>
-              <p className="text-xs text-muted-foreground">Use existing compartment codes (example: COMP-A1R1-01)</p>
-              {fields.map((field, idx) => (
-                <div key={field.id} className="flex gap-2">
-                  <Input
-                    {...regCreate(`compartmentBarcodes.${idx}.value`)}
-                    placeholder={`COMP-... (e.g. COMP-A1R1-0${idx + 1})`}
-                    className="font-mono flex-1"
-                  />
-                  {fields.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => remove(idx)}
-                    >
-                      <Minus className="size-4" />
-                    </Button>
-                  )}
-                </div>
-              ))}
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => append({ value: '' })}
-                className="self-start"
+              <Label>Rack</Label>
+              <select
+                {...regCreate('rackId')}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
               >
-                <Plus className="size-3.5 mr-1.5" />
-                Add Compartment
-              </Button>
+                <option value="">Select a rack…</option>
+                {(racks ?? []).map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {buildCompartmentBarcode(r, 1).replace(/-\d+$/, '')} — {r.rackIdentifier}
+                  </option>
+                ))}
+              </select>
+              {createErrors.rackId && (
+                <p className="text-xs text-destructive">{createErrors.rackId.message}</p>
+              )}
             </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Number of Compartments</Label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                {...regCreate('compartmentCount')}
+                className="w-28"
+              />
+              {createErrors.compartmentCount && (
+                <p className="text-xs text-destructive">{createErrors.compartmentCount.message}</p>
+              )}
+            </div>
+
+            {generatedBarcodes.length > 0 && (
+              <div className="rounded-lg border border-border bg-muted/40 p-3 flex flex-col gap-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Generated Compartments</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {generatedBarcodes.map((b) => (
+                    <span key={b} className="font-mono text-xs rounded-md bg-primary/10 text-primary px-2 py-0.5">{b}</span>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <Button type="submit" disabled={createMutation.isPending} className="w-full">
               Create Trolley

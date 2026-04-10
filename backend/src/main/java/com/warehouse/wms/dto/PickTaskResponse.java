@@ -13,4 +13,7 @@ public class PickTaskResponse {
     String binBarcode;
     Integer quantity;
     String state;
+    Long orderId;
+    String soNumber;
+    String status;
 }

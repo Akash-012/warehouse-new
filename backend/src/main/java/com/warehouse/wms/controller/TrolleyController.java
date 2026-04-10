@@ -5,6 +5,7 @@ import com.warehouse.wms.dto.TrolleyAssignRequest;
 import com.warehouse.wms.dto.TrolleyCreateRequest;
 import com.warehouse.wms.entity.RackCompartment;
 import com.warehouse.wms.entity.Trolley;
+import com.warehouse.wms.repository.RackCompartmentRepository;
 import com.warehouse.wms.service.TrolleyService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -13,7 +14,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/trolleys")
@@ -22,11 +25,21 @@ import java.util.List;
 public class TrolleyController {
 
     private final TrolleyService trolleyService;
+    private final RackCompartmentRepository rackCompartmentRepository;
 
     @Operation(summary = "List all trolleys")
     @GetMapping
-    public ResponseEntity<List<Trolley>> getAll() {
-        return ResponseEntity.ok(trolleyService.getAllTrolleys());
+    public ResponseEntity<List<Map<String, Object>>> getAll() {
+        return ResponseEntity.ok(trolleyService.getAllTrolleys().stream().map(t -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id", t.getId());
+            m.put("trolleyIdentifier", t.getTrolleyIdentifier());
+            List<String> barcodes = rackCompartmentRepository.findByTrolleyId(t.getId())
+                    .stream().map(c -> c.getCompartmentIdentifier()).toList();
+            m.put("compartments", barcodes);
+            m.put("status", "IDLE");
+            return m;
+        }).toList());
     }
 
     @Operation(summary = "Create trolley and bind compartments")

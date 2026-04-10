@@ -49,10 +49,12 @@ public class InventoryController {
             m.put("skuName", i.getSku().getDescription());
             m.put("binBarcode", i.getBin() != null ? i.getBin().getBarcode() : null);
             m.put("batchNo", i.getBatchNo());
+            m.put("barcode", i.getSerialNo());
             m.put("serialNo", i.getSerialNo());
             m.put("quantity", i.getQuantity());
             m.put("state", i.getState().name());
             m.put("createdAt", i.getCreatedAt());
+            m.put("updatedAt", i.getUpdatedAt());
             return m;
         }).toList();
 

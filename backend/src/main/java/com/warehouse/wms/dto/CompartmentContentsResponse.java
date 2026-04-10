@@ -12,4 +12,5 @@ public class CompartmentContentsResponse {
     Long salesOrderId;
     String orderNumber;
     List<String> pickedItemBarcodes;
+    String status;
 }

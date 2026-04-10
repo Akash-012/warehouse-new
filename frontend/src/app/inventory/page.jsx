@@ -102,7 +102,8 @@ export default function InventoryPage() {
       api.get('/inventory', {
         params: { page, size: 20, search: search || undefined, state: state || undefined, warehouse: warehouse !== 'ALL' ? warehouse : undefined },
       }).then((r) => r.data ?? {}),
-    staleTime: 30_000,
+    staleTime: 0,
+    refetchInterval: 15_000,
     retry: false,
   });
 

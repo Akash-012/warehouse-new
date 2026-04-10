@@ -2,6 +2,7 @@ package com.warehouse.wms.service;
 
 import com.warehouse.wms.dto.ExecutionResult;
 import com.warehouse.wms.dto.PickScanRequest;
+import com.warehouse.wms.dto.PickTaskResponse;
 import com.warehouse.wms.dto.PickingSessionResponse;
 import com.warehouse.wms.dto.PickingSessionResponse.PickingSessionItem;
 import com.warehouse.wms.dto.PickingStartRequest;
@@ -152,7 +153,20 @@ public class PickingService {
                 .build();
     }
 
-    public List<PickTask> getPendingTasks() {
-        return pickTaskRepository.findByStatusOrderByIdAsc("PENDING");
+    public List<PickTaskResponse> getPendingTasks() {
+        return pickTaskRepository.findByStatusOrderByIdAsc("PENDING").stream()
+                .map(t -> PickTaskResponse.builder()
+                        .id(t.getId())
+                        .salesOrderLineId(t.getSalesOrderLine().getId())
+                        .inventoryId(t.getInventory().getId())
+                        .skuCode(t.getSkuCode())
+                        .binBarcode(t.getBinBarcode())
+                        .quantity(t.getQuantityToPick())
+                        .state(t.getStatus())
+                        .status(t.getStatus())
+                        .orderId(t.getSalesOrderLine().getSalesOrder().getId())
+                        .soNumber(t.getSalesOrderLine().getSalesOrder().getSoNumber())
+                        .build())
+                .toList();
     }
 }

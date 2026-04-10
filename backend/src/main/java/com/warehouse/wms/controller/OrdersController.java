@@ -32,6 +32,7 @@ public class OrdersController {
             m.put("customerName", row[1]);
             m.put("status", row[2]);
             m.put("createdAt", row[3]);
+            m.put("soNumber", row[4]);
             return m;
         }).toList();
     }

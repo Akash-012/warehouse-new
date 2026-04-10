@@ -2,9 +2,9 @@ package com.warehouse.wms.controller;
 
 import com.warehouse.wms.dto.ExecutionResult;
 import com.warehouse.wms.dto.PickScanRequest;
+import com.warehouse.wms.dto.PickTaskResponse;
 import com.warehouse.wms.dto.PickingSessionResponse;
 import com.warehouse.wms.dto.PickingStartRequest;
-import com.warehouse.wms.entity.PickTask;
 import com.warehouse.wms.service.PickingService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
@@ -37,7 +37,7 @@ public class PickingController {
 
     @Operation(summary = "List pending pick tasks")
     @GetMapping("/tasks/pending")
-    public ResponseEntity<List<PickTask>> pendingTasks() {
+    public ResponseEntity<List<PickTaskResponse>> pendingTasks() {
         return ResponseEntity.ok(pickingService.getPendingTasks());
     }
 }
