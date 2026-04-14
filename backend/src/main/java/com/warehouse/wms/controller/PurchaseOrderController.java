@@ -1,14 +1,21 @@
 package com.warehouse.wms.controller;
 
+import com.warehouse.wms.dto.CreatePORequest;
+import com.warehouse.wms.entity.PurchaseOrder;
+import com.warehouse.wms.entity.PurchaseOrderLine;
+import com.warehouse.wms.entity.Sku;
+import com.warehouse.wms.entity.Warehouse;
 import com.warehouse.wms.repository.PurchaseOrderRepository;
+import com.warehouse.wms.repository.SkuRepository;
+import com.warehouse.wms.repository.WarehouseRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,6 +27,45 @@ import java.util.Map;
 public class PurchaseOrderController {
 
     private final PurchaseOrderRepository purchaseOrderRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final SkuRepository skuRepository;
+
+    @PostMapping
+    @PreAuthorize("hasAuthority('INBOUND_RECEIVE')")
+    public ResponseEntity<Map<String, Object>> create(@Valid @RequestBody CreatePORequest request) {
+        Warehouse warehouse = warehouseRepository.findById(request.getWarehouseId())
+                .orElseThrow(() -> new EntityNotFoundException("Warehouse not found: " + request.getWarehouseId()));
+
+        PurchaseOrder po = new PurchaseOrder();
+        po.setPoNumber("PO-" + System.currentTimeMillis());
+        po.setSupplier(request.getSupplier());
+        po.setExpectedArrivalDate(request.getExpectedArrivalDate());
+        po.setStatus("PENDING");
+
+        List<PurchaseOrderLine> lines = new ArrayList<>();
+        for (CreatePORequest.LineItem item : request.getLines()) {
+            Sku sku = skuRepository.findById(item.getSkuId())
+                    .orElseThrow(() -> new EntityNotFoundException("SKU not found: " + item.getSkuId()));
+            PurchaseOrderLine line = new PurchaseOrderLine();
+            line.setPurchaseOrder(po);
+            line.setSku(sku);
+            line.setQuantity(item.getQuantity());
+            lines.add(line);
+        }
+        po.setLines(lines);
+        PurchaseOrder saved = purchaseOrderRepository.save(po);
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("id", saved.getId());
+        result.put("poNumber", saved.getPoNumber());
+        result.put("supplier", saved.getSupplier());
+        result.put("status", saved.getStatus());
+        result.put("warehouseId", warehouse.getId());
+        result.put("warehouseName", warehouse.getName());
+        result.put("expectedArrivalDate", saved.getExpectedArrivalDate());
+        result.put("lineCount", saved.getLines().size());
+        return ResponseEntity.ok(result);
+    }
 
     @GetMapping
     public List<Map<String, Object>> list() {

@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { Download, Loader2, Package, Plus, Search, Trash2, X, ClipboardList } from 'lucide-react';
+import { Download, Loader2, Package, Plus, Search, Trash2, X, ClipboardList, FilePlus } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import StatCard from '@/components/StatCard';
@@ -37,6 +37,17 @@ const receiveSchema = z.object({
     quantity: z.coerce.number().int().min(1, 'Minimum 1'),
     batchNo: z.string().min(1, 'Batch number is required'),
   })).min(1, 'At least one line is required'),
+});
+
+const createPoSchema = z.object({
+  warehouseId: z.coerce.number().int().positive('Warehouse is required'),
+  supplier: z.string().min(1, 'Supplier is required'),
+  expectedArrivalDate: z.string().optional(),
+  lines: z.array(z.object({
+    skuId: z.coerce.number().int().positive('SKU ID is required'),
+    skuName: z.string().optional(),
+    quantity: z.coerce.number().int().min(1, 'Minimum 1'),
+  })).min(1, 'At least one product is required'),
 });
 
 const normalizePoStatus = (status) => {
@@ -79,6 +90,7 @@ async function exportPOs(pos) {
 export default function InboundPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [createPoOpen, setCreatePoOpen] = useState(false);
   const [grnResult, setGrnResult] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -109,6 +121,43 @@ export default function InboundPage() {
       reset();
     },
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to receive PO'),
+  });
+
+  const {
+    register: registerPo,
+    control: controlPo,
+    handleSubmit: handleSubmitPo,
+    reset: resetPo,
+    setValue: setPoValue,
+    formState: { errors: errorsPo },
+  } = useForm({
+    resolver: zodResolver(createPoSchema),
+    defaultValues: { warehouseId: '', supplier: '', expectedArrivalDate: '', lines: [{ skuId: '', skuName: '', quantity: 1 }] },
+  });
+
+  const { fields: poLines, append: appendPoLine, remove: removePoLine } = useFieldArray({ control: controlPo, name: 'lines' });
+
+  const { data: warehouses } = useQuery({
+    queryKey: ['warehouses'],
+    queryFn: () => api.get('/master/warehouses').then((r) => r.data ?? []),
+    staleTime: 60_000,
+  });
+
+  const { data: skus } = useQuery({
+    queryKey: ['skus'],
+    queryFn: () => api.get('/master/skus').then((r) => r.data ?? []),
+    staleTime: 60_000,
+  });
+
+  const createPoMutation = useMutation({
+    mutationFn: (payload) => api.post('/purchase-orders', payload),
+    onSuccess: async ({ data }) => {
+      toast.success(`PO ${data.poNumber} created successfully`);
+      await queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+      setCreatePoOpen(false);
+      resetPo();
+    },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to create PO'),
   });
 
   const selectablePOs = useMemo(
@@ -171,6 +220,13 @@ export default function InboundPage() {
             </Button>
             <Button
               size="sm"
+              variant="outline"
+              onClick={() => { resetPo(); setCreatePoOpen(true); }}
+            >
+              <FilePlus className="size-3.5 mr-1.5" /> Create PO
+            </Button>
+            <Button
+              size="sm"
               onClick={() => {
                 const firstPo = selectablePOs[0];
                 const firstPoId = firstPo ? String(firstPo.id) : '';
@@ -185,6 +241,109 @@ export default function InboundPage() {
           </div>
         }
       />
+
+      {/* Create PO Sheet */}
+      <SlideOverForm
+        open={createPoOpen}
+        onOpenChange={(v) => { setCreatePoOpen(v); if (!v) resetPo(); }}
+        title="Create Purchase Order"
+        description="Fill in the details below to create a new purchase order."
+      >
+        <form
+          onSubmit={handleSubmitPo((d) => {
+            const payload = {
+              warehouseId: Number(d.warehouseId),
+              supplier: d.supplier,
+              expectedArrivalDate: d.expectedArrivalDate || undefined,
+              lines: d.lines.map((l) => ({ skuId: Number(l.skuId), quantity: Number(l.quantity) })),
+            };
+            createPoMutation.mutate(payload);
+          })}
+          className="space-y-4"
+        >
+          {/* Warehouse */}
+          <div className="space-y-1.5">
+            <Label>Warehouse</Label>
+            <Select onValueChange={(v) => setPoValue('warehouseId', Number(v), { shouldValidate: true })}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Select warehouse" />
+              </SelectTrigger>
+              <SelectContent>
+                {(warehouses ?? []).map((w) => (
+                  <SelectItem key={w.id} value={String(w.id)}>{w.name} {w.location ? `— ${w.location}` : ''}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errorsPo.warehouseId && <p className="text-xs text-destructive">{errorsPo.warehouseId.message}</p>}
+          </div>
+
+          {/* Supplier */}
+          <div className="space-y-1.5">
+            <Label>Supplier</Label>
+            <Input placeholder="e.g. Acme Corp" className="h-10" {...registerPo('supplier')} />
+            {errorsPo.supplier && <p className="text-xs text-destructive">{errorsPo.supplier.message}</p>}
+          </div>
+
+          {/* Expected Arrival */}
+          <div className="space-y-1.5">
+            <Label>Expected Arrival Date <span className="text-muted-foreground text-xs">(optional)</span></Label>
+            <Input type="date" className="h-10" {...registerPo('expectedArrivalDate')} />
+          </div>
+
+          <Separator />
+
+          {/* Product Lines */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Products</Label>
+              <Button type="button" size="sm" variant="outline" onClick={() => appendPoLine({ skuId: '', skuName: '', quantity: 1 })}>
+                <Plus className="size-3.5 mr-1" /> Add Product
+              </Button>
+            </div>
+            {poLines.map((field, i) => (
+              <div key={field.id} className="rounded-xl border border-border/60 p-3 space-y-2.5 relative">
+                <p className="text-xs font-medium text-muted-foreground">Product {i + 1}</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">SKU ID</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      placeholder="e.g. 3"
+                      className="h-8 text-sm"
+                      {...registerPo(`lines.${i}.skuId`)}
+                    />
+                    {errorsPo.lines?.[i]?.skuId && <p className="text-[10px] text-destructive">{errorsPo.lines[i].skuId.message}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Quantity</Label>
+                    <Input type="number" min={1} className="h-8 text-sm" {...registerPo(`lines.${i}.quantity`)} />
+                    {errorsPo.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errorsPo.lines[i].quantity.message}</p>}
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Product Name <span className="text-muted-foreground">(optional, for reference)</span></Label>
+                  <Input placeholder="e.g. Widget A" className="h-8 text-sm" {...registerPo(`lines.${i}.skuName`)} />
+                </div>
+                {poLines.length > 1 && (
+                  <button type="button" onClick={() => removePoLine(i)} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+            {errorsPo.lines?.root && <p className="text-xs text-destructive">{errorsPo.lines.root.message}</p>}
+          </div>
+
+          <SheetFooter>
+            <Button type="button" variant="outline" onClick={() => setCreatePoOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={createPoMutation.isPending}>
+              {createPoMutation.isPending && <Loader2 className="size-3.5 mr-2 animate-spin" />}
+              Create PO
+            </Button>
+          </SheetFooter>
+        </form>
+      </SlideOverForm>
 
       {/* Receive PO Sheet */}
       <SlideOverForm

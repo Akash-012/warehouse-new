@@ -59,4 +59,22 @@ public class TrolleyController {
     public ResponseEntity<List<CompartmentContentsResponse>> getContents(@PathVariable("barcode") String trolleyBarcode) {
         return ResponseEntity.ok(trolleyService.getTrolleyCompartmentContents(trolleyBarcode));
     }
+
+    @Operation(summary = "Add compartments to an existing trolley")
+    @PostMapping("/{barcode}/compartments")
+    @PreAuthorize("hasAuthority('TROLLEYS_CREATE')")
+    public ResponseEntity<Map<String, Object>> addCompartments(
+            @PathVariable("barcode") String trolleyBarcode,
+            @RequestBody Map<String, List<String>> body) {
+        List<String> barcodes = body.get("compartmentBarcodes");
+        if (barcodes == null || barcodes.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("detail", "compartmentBarcodes is required"));
+        }
+        List<String> added = trolleyService.addCompartments(trolleyBarcode, barcodes);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("trolleyBarcode", trolleyBarcode);
+        result.put("added", added);
+        result.put("count", added.size());
+        return ResponseEntity.ok(result);
+    }
 }

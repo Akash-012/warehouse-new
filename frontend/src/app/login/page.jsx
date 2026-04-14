@@ -1,23 +1,37 @@
-'use client';
-export const dynamic = 'force-dynamic';
+"use client";
+export const dynamic = "force-dynamic";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import Link from 'next/link';
-import { Layers3, Loader2, LockKeyhole, UserRound, Eye, EyeOff, BookOpen } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import api from '@/lib/api';
-import { toast } from 'sonner';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import Link from "next/link";
+import {
+  Layers3,
+  Loader2,
+  LockKeyhole,
+  UserRound,
+  Eye,
+  EyeOff,
+  BookOpen,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import api from "@/lib/api";
+import { toast } from "sonner";
 
 const loginSchema = z.object({
-  username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required'),
+  username: z.string().min(1, "Username is required"),
+  password: z.string().min(1, "Password is required"),
 });
 
 export default function LoginPage() {
@@ -27,10 +41,10 @@ export default function LoginPage() {
 
   // Clear any stale/expired token when landing on login
   useEffect(() => {
-    localStorage.removeItem('wms_token');
-    localStorage.removeItem('wms_username');
-    localStorage.removeItem('wms_role');
-    localStorage.removeItem('wms_permissions');
+    localStorage.removeItem("wms_token");
+    localStorage.removeItem("wms_username");
+    localStorage.removeItem("wms_role");
+    localStorage.removeItem("wms_permissions");
   }, []);
 
   const {
@@ -41,22 +55,27 @@ export default function LoginPage() {
   } = useForm({
     resolver: zodResolver(loginSchema),
     defaultValues: {
-      username: 'admin',
-      password: 'admin123',
+      username: "admin",
+      password: "admin123",
     },
   });
 
   const onSubmit = async (values) => {
     try {
-      const { data } = await api.post('/auth/login', values);
-      localStorage.setItem('wms_token', data.token);
-      localStorage.setItem('wms_username', data.username);
-      localStorage.setItem('wms_role', data.role);
-      localStorage.setItem('wms_permissions', JSON.stringify(data.permissions ?? []));
-      toast.success('Signed in successfully');
-      router.push('/dashboard');
+      const { data } = await api.post("/auth/login", values);
+      localStorage.setItem("wms_token", data.token);
+      localStorage.setItem("wms_username", data.username);
+      localStorage.setItem("wms_role", data.role);
+      localStorage.setItem(
+        "wms_permissions",
+        JSON.stringify(data.permissions ?? []),
+      );
+      toast.success("Signed in successfully");
+      router.push("/dashboard");
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Invalid username or password');
+      toast.error(
+        error.response?.data?.detail || "Invalid username or password",
+      );
     }
   };
 
@@ -72,21 +91,28 @@ export default function LoginPage() {
               WMS Pro Control Tower
             </div>
             <h1 className="mt-8 max-w-xl text-4xl font-semibold tracking-tight text-foreground">
-              Warehouse software UI focused on speed, operator flow, and reusable surfaces.
+              Warehouse software UI focused on speed, operator flow, and
+              reusable surfaces.
             </h1>
             <p className="mt-4 max-w-lg text-base text-muted-foreground">
-              Monitor inbound, inventory, picking, packing, and shipping from one fast operational workspace.
+              Monitor inbound, inventory, picking, packing, and shipping from
+              one fast operational workspace.
             </p>
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             {[
-              ['Fast routing', 'Low-friction operator workflows'],
-              ['Reusable blocks', 'Shared patterns for each module'],
-              ['Live visibility', 'KPIs and queue states in one place'],
+              ["Fast routing", "Low-friction operator workflows"],
+              ["Reusable blocks", "Shared patterns for each module"],
+              ["Live visibility", "KPIs and queue states in one place"],
             ].map(([title, description]) => (
-              <div key={title} className="rounded-2xl border border-border bg-background/55 p-4">
+              <div
+                key={title}
+                className="rounded-2xl border border-border bg-background/55 p-4"
+              >
                 <p className="text-sm font-medium text-foreground">{title}</p>
-                <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {description}
+                </p>
               </div>
             ))}
           </div>
@@ -107,7 +133,9 @@ export default function LoginPage() {
               <LockKeyhole className="size-6" />
             </div>
             <CardTitle className="text-2xl">Sign in</CardTitle>
-            <CardDescription>Use your warehouse credentials to continue.</CardDescription>
+            <CardDescription>
+              Use your warehouse credentials to continue.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
@@ -120,10 +148,14 @@ export default function LoginPage() {
                   <Input
                     id="username"
                     className="h-11 rounded-xl border-border/80 bg-background/80 pl-11 pr-3 text-sm shadow-sm transition-all focus-visible:ring-2"
-                    {...register('username')}
+                    {...register("username")}
                   />
                 </div>
-                {errors.username ? <p className="text-xs text-destructive">{errors.username.message}</p> : null}
+                {errors.username ? (
+                  <p className="text-xs text-destructive">
+                    {errors.username.message}
+                  </p>
+                ) : null}
               </div>
 
               <div className="space-y-2">
@@ -134,24 +166,41 @@ export default function LoginPage() {
                   </span>
                   <Input
                     id="password"
-                    type={showPassword ? 'text' : 'password'}
+                    type={showPassword ? "text" : "password"}
                     className="h-11 rounded-xl border-border/80 bg-background/80 pl-12 pr-14 text-sm shadow-sm transition-all focus-visible:ring-2"
-                    {...register('password')}
+                    {...register("password")}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((value) => !value)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
                     className="absolute right-2 top-1/2 z-10 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted/70 hover:text-foreground"
                   >
-                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    {showPassword ? (
+                      <EyeOff className="size-4" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
                   </button>
                 </div>
-                {errors.password ? <p className="text-xs text-destructive">{errors.password.message}</p> : null}
+                {errors.password ? (
+                  <p className="text-xs text-destructive">
+                    {errors.password.message}
+                  </p>
+                ) : null}
               </div>
 
-              <Button type="submit" className="w-full" size="lg" disabled={isSubmitting}>
-                {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              <Button
+                type="submit"
+                className="w-full"
+                size="lg"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : null}
                 Continue to dashboard
               </Button>
 
@@ -167,34 +216,51 @@ export default function LoginPage() {
 
               <div className="space-y-2 rounded-2xl border border-border bg-muted/40 p-4 text-sm text-muted-foreground">
                 <div className="flex items-center justify-between">
-                  <p className="font-semibold text-foreground text-xs uppercase tracking-wide">Demo Credentials</p>
+                  <p className="font-semibold text-foreground text-xs uppercase tracking-wide">
+                    Demo Credentials
+                  </p>
                   <button
                     type="button"
                     onClick={() => setShowDemoPasswords((v) => !v)}
-                    aria-label={showDemoPasswords ? 'Hide demo passwords' : 'Show demo passwords'}
+                    aria-label={
+                      showDemoPasswords
+                        ? "Hide demo passwords"
+                        : "Show demo passwords"
+                    }
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    {showDemoPasswords ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
+                    {showDemoPasswords ? (
+                      <EyeOff className="size-3.5" />
+                    ) : (
+                      <Eye className="size-3.5" />
+                    )}
                   </button>
                 </div>
                 {[
-                  { role: 'Super Admin', user: 'superadmin', pass: 'superadmin123' },
-                  { role: 'Admin',       user: 'admin',      pass: 'admin123'      },
-                  { role: 'Manager',     user: 'manager',    pass: 'manager123'    },
-                  { role: 'Worker',      user: 'worker',     pass: 'worker123'     },
+                  {
+                    role: "Super Admin",
+                    user: "superadmin",
+                    pass: "superadmin123",
+                  },
+                  { role: "Admin", user: "admin", pass: "admin123" },
+                  { role: "Manager", user: "manager", pass: "manager123" },
+                  { role: "Worker", user: "worker", pass: "worker123" },
                 ].map(({ role, user, pass }) => (
                   <button
                     key={user}
                     type="button"
                     onClick={() => {
-                      setValue('username', user);
-                      setValue('password', pass);
+                      setValue("username", user);
+                      setValue("password", pass);
                     }}
                     className="flex w-full items-center justify-between gap-3 rounded-lg px-3 py-1.5 text-left transition-colors hover:bg-muted"
                   >
-                    <span className="w-24 shrink-0 text-xs text-muted-foreground">{role}</span>
+                    <span className="w-24 shrink-0 text-xs text-muted-foreground">
+                      {role}
+                    </span>
                     <span className="truncate font-mono text-xs text-foreground">
-                      {user} / {showDemoPasswords ? pass : '•'.repeat(pass.length)}
+                      {user} /{" "}
+                      {showDemoPasswords ? pass : "•".repeat(pass.length)}
                     </span>
                   </button>
                 ))}

@@ -36,6 +36,30 @@ public class TrolleyService {
     }
 
     @Transactional
+    public List<String> addCompartments(String trolleyBarcode, List<String> compartmentBarcodes) {
+        Trolley trolley = trolleyRepository.findByTrolleyIdentifier(trolleyBarcode)
+                .orElseThrow(() -> new EntityNotFoundException("Trolley not found: " + trolleyBarcode));
+
+        Rack defaultRack = rackRepository.findAll().stream().findFirst()
+                .orElseThrow(() -> new EntityNotFoundException("No racks found"));
+
+        List<String> added = new java.util.ArrayList<>();
+        for (String barcode : compartmentBarcodes) {
+            if (rackCompartmentRepository.findByCompartmentIdentifier(barcode).isPresent()) {
+                throw new InventoryStateException("Compartment already exists: " + barcode);
+            }
+            Rack rack = resolveRackFromBarcode(barcode, defaultRack);
+            RackCompartment c = new RackCompartment();
+            c.setCompartmentIdentifier(barcode);
+            c.setRack(rack);
+            c.setTrolley(trolley);
+            rackCompartmentRepository.save(c);
+            added.add(barcode);
+        }
+        return added;
+    }
+
+    @Transactional
     public Trolley createTrolley(TrolleyCreateRequest request) {
         Trolley trolley = trolleyRepository.findByTrolleyIdentifier(request.getTrolleyBarcode())
                 .orElseGet(() -> {

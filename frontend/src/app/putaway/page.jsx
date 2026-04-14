@@ -47,9 +47,9 @@ const putawaySchema = z.object({
 });
 
 const PRIORITY_CONFIG = {
-  1: { label: 'P1 Ã¢â‚¬â€ High', cls: 'bg-rose-500/12 text-rose-600 ring-rose-500/20 dark:text-rose-400' },
-  2: { label: 'P2 Ã¢â‚¬â€ Med',  cls: 'bg-amber-500/12 text-amber-600 ring-amber-500/20 dark:text-amber-400' },
-  3: { label: 'P3 Ã¢â‚¬â€ Low',  cls: 'bg-slate-500/12 text-slate-600 ring-slate-500/20 dark:text-slate-400' },
+  1: { label: 'P1 - High', cls: 'bg-rose-500/12 text-rose-600 ring-rose-500/20 dark:text-rose-400' },
+  2: { label: 'P2 - Med',  cls: 'bg-amber-500/12 text-amber-600 ring-amber-500/20 dark:text-amber-400' },
+  3: { label: 'P3 - Low',  cls: 'bg-slate-500/12 text-slate-600 ring-slate-500/20 dark:text-slate-400' },
 };
 
 function PriorityBadge({ priority }) {
@@ -359,7 +359,7 @@ export default function PutawayPage() {
                   <p>
                     Bin:{' '}
                     <span className="font-mono text-foreground">
-                      {lastExecution.binBarcode ?? 'Ã¢â‚¬â€'}
+                      {lastExecution.binBarcode ?? ' - '}
                     </span>
                   </p>
                   <div className="flex items-center gap-2">

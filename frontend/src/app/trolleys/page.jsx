@@ -22,7 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Truck, Plus, Search, Inbox, Link2, List } from 'lucide-react';
+import { Truck, Plus, Search, Inbox, Link2, List, LayoutGrid } from 'lucide-react';
 import StatusBadge from '@/components/StatusBadge';
 
 const createSchema = z.object({
@@ -34,6 +34,13 @@ const createSchema = z.object({
 const assignSchema = z.object({
   compartmentBarcode: z.string().min(1, 'Required'),
   salesOrderId: z.coerce.number().int().positive('Order ID is required'),
+});
+
+const addCompartmentSchema = z.object({
+  trolleyBarcode: z.string().min(1, 'Select a trolley'),
+  rackId: z.string().min(1, 'Rack is required'),
+  compartmentCount: z.coerce.number().int().min(1, 'At least 1').max(20, 'Max 20'),
+  startSeq: z.coerce.number().int().min(1, 'Min 1'),
 });
 
 export default function TrolleysPage() {
@@ -65,10 +72,10 @@ export default function TrolleysPage() {
   };
 
   // Preview generated barcodes
-  const previewBarcodes = (rackId, count) => {
+  const previewBarcodes = (rackId, count, startSeq = 1) => {
     const rack = (racks ?? []).find((r) => String(r.id) === String(rackId));
     if (!rack || !count) return [];
-    return Array.from({ length: Number(count) }, (_, i) => buildCompartmentBarcode(rack, i + 1));
+    return Array.from({ length: Number(count) }, (_, i) => buildCompartmentBarcode(rack, startSeq + i));
   };
 
   const {
@@ -93,6 +100,22 @@ export default function TrolleysPage() {
     reset: resetAssign,
     formState: { errors: assignErrors },
   } = useForm({ resolver: zodResolver(assignSchema) });
+
+  const {
+    register: regAddComp,
+    handleSubmit: handleAddComp,
+    reset: resetAddComp,
+    watch: watchAddComp,
+    formState: { errors: addCompErrors },
+  } = useForm({
+    resolver: zodResolver(addCompartmentSchema),
+    defaultValues: { trolleyBarcode: '', rackId: '', compartmentCount: 1, startSeq: 1 },
+  });
+
+  const watchedAddRackId = watchAddComp('rackId');
+  const watchedAddCount = watchAddComp('compartmentCount');
+  const watchedAddSeq = watchAddComp('startSeq');
+  const addPreviewBarcodes = previewBarcodes(watchedAddRackId, watchedAddCount, Number(watchedAddSeq) || 1);
 
   const createMutation = useMutation({
     mutationFn: (data) => {
@@ -121,6 +144,17 @@ export default function TrolleysPage() {
       resetAssign();
     },
     onError: (e) => toast.error(e?.response?.data?.detail ?? 'Failed to assign compartment'),
+  });
+
+  const addCompartmentMutation = useMutation({
+    mutationFn: ({ trolleyBarcode, compartmentBarcodes }) =>
+      api.post(`/trolleys/${encodeURIComponent(trolleyBarcode)}/compartments`, { compartmentBarcodes }).then((r) => r.data),
+    onSuccess: (data) => {
+      toast.success(`Added ${data.count} compartment(s) to ${data.trolleyBarcode}`);
+      queryClient.invalidateQueries({ queryKey: ['trolleys-list'] });
+      resetAddComp();
+    },
+    onError: (e) => toast.error(e?.response?.data?.detail ?? 'Failed to add compartments'),
   });
 
   const lookupMutation = useMutation({
@@ -188,7 +222,7 @@ export default function TrolleysPage() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         {/* Create trolley */}
         <div className="glass-card rounded-2xl p-6 flex flex-col gap-5">
           <div className="flex items-center gap-2">
@@ -259,6 +293,108 @@ export default function TrolleysPage() {
 
             <Button type="submit" disabled={createMutation.isPending} className="w-full">
               Create Trolley
+            </Button>
+          </form>
+        </div>
+
+        {/* Add Compartment to existing trolley */}
+        <div className="glass-card rounded-2xl p-6 flex flex-col gap-5">
+          <div className="flex items-center gap-2">
+            <LayoutGrid className="size-4 text-primary" />
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+              Add Compartment
+            </h2>
+          </div>
+
+          <form
+            onSubmit={handleAddComp((d) => {
+              const rack = (racks ?? []).find((r) => String(r.id) === String(d.rackId));
+              const compartmentBarcodes = Array.from(
+                { length: Number(d.compartmentCount) },
+                (_, i) => buildCompartmentBarcode(rack, Number(d.startSeq) + i)
+              );
+              addCompartmentMutation.mutate({ trolleyBarcode: d.trolleyBarcode, compartmentBarcodes });
+            })}
+            className="flex flex-col gap-4"
+          >
+            <div className="flex flex-col gap-1.5">
+              <Label>Trolley</Label>
+              <select
+                {...regAddComp('trolleyBarcode')}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Select a trolley…</option>
+                {(trolleyList ?? []).map((t) => (
+                  <option key={t.id} value={t.trolleyIdentifier}>
+                    {t.trolleyIdentifier}
+                  </option>
+                ))}
+              </select>
+              {addCompErrors.trolleyBarcode && (
+                <p className="text-xs text-destructive">{addCompErrors.trolleyBarcode.message}</p>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label>Rack</Label>
+              <select
+                {...regAddComp('rackId')}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Select a rack…</option>
+                {(racks ?? []).map((r) => (
+                  <option key={r.id} value={r.id}>
+                    {r.rackIdentifier}
+                  </option>
+                ))}
+              </select>
+              {addCompErrors.rackId && (
+                <p className="text-xs text-destructive">{addCompErrors.rackId.message}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex flex-col gap-1.5">
+                <Label>Start Sequence</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  {...regAddComp('startSeq')}
+                  className="w-full"
+                />
+                {addCompErrors.startSeq && (
+                  <p className="text-xs text-destructive">{addCompErrors.startSeq.message}</p>
+                )}
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <Label>Count</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  max={20}
+                  {...regAddComp('compartmentCount')}
+                  className="w-full"
+                />
+                {addCompErrors.compartmentCount && (
+                  <p className="text-xs text-destructive">{addCompErrors.compartmentCount.message}</p>
+                )}
+              </div>
+            </div>
+
+            {addPreviewBarcodes.length > 0 && (
+              <div className="rounded-lg border border-border bg-muted/40 p-3 flex flex-col gap-1.5">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Preview</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {addPreviewBarcodes.map((b) => (
+                    <span key={b} className="font-mono text-xs rounded-md bg-primary/10 text-primary px-2 py-0.5">{b}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button type="submit" disabled={addCompartmentMutation.isPending} className="w-full">
+              <Plus className="size-4 mr-1" />
+              Add Compartments
             </Button>
           </form>
         </div>
