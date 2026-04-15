@@ -265,6 +265,7 @@ public class DataInitializer implements CommandLineRunner {
         po1.setSupplier("TechSupply Co.");
         po1.setExpectedArrivalDate(LocalDate.now().plusDays(5));
         po1.setStatus("OPEN");
+        po1.setPriority(PurchaseOrder.Priority.P1);
         po1 = purchaseOrderRepository.save(po1);
 
         int[][] po1Lines = {{0,50},{1,200},{2,100},{3,80},{4,20}};
@@ -275,6 +276,7 @@ public class DataInitializer implements CommandLineRunner {
         po2.setSupplier("Global Parts Ltd.");
         po2.setExpectedArrivalDate(LocalDate.now().plusDays(10));
         po2.setStatus("OPEN");
+        po2.setPriority(PurchaseOrder.Priority.P2);
         po2 = purchaseOrderRepository.save(po2);
 
         int[][] po2Lines = {{5,150},{6,100},{7,80},{8,200},{9,60}};
@@ -302,6 +304,7 @@ public class DataInitializer implements CommandLineRunner {
             po.setSupplier("Test Supplier A");
             po.setExpectedArrivalDate(LocalDate.now().plusDays(2));
             po.setStatus("PENDING");
+            po.setPriority(PurchaseOrder.Priority.P1);
             po = purchaseOrderRepository.save(po);
             savePOLine(po, skus.get(0), 3);  // SKU-001 Laptop 15"
             savePOLine(po, skus.get(1), 5);  // SKU-002 Wireless Mouse
@@ -314,6 +317,7 @@ public class DataInitializer implements CommandLineRunner {
             po.setSupplier("Test Supplier B");
             po.setExpectedArrivalDate(LocalDate.now().plusDays(3));
             po.setStatus("PENDING");
+            po.setPriority(PurchaseOrder.Priority.P2);
             po = purchaseOrderRepository.save(po);
             savePOLine(po, skus.get(2), 4);  // SKU-003 USB-C Hub
             savePOLine(po, skus.get(3), 2);  // SKU-004 Mechanical Keyboard

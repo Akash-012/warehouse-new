@@ -11,4 +11,6 @@ public interface PutawayTaskRepository extends JpaRepository<PutawayTask, Long> 
     List<PutawayTask> findByStatusOrderByPriorityAscIdAsc(PutawayTask.PutawayTaskStatus status);
 
     java.util.Optional<PutawayTask> findByInventoryIdAndStatus(Long inventoryId, PutawayTask.PutawayTaskStatus status);
+
+    boolean existsByInventoryId(Long inventoryId);
 }

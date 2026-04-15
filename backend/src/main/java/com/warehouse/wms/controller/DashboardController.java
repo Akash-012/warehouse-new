@@ -51,7 +51,7 @@ public class DashboardController {
         double binUtilizationPct = totalVolumeCm3 > 0 ? (occupiedVolumeCm3 / totalVolumeCm3) * 100.0 : 0.0;
 
         // Inventory breakdown by state
-        List<Inventory> all = inventoryRepository.findAll();
+        List<Inventory> all = inventoryRepository.findAllWithDetails();
         Map<String, Long> byState = new LinkedHashMap<>();
         for (Inventory.InventoryState s : Inventory.InventoryState.values()) {
             long cnt = all.stream().filter(i -> i.getState() == s).count();

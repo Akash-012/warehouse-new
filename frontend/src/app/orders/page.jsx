@@ -41,6 +41,14 @@ const orderSchema = z.object({
   })),
 });
 
+// Safely parse date strings including "yyyy-MM-dd HH:mm:ss" format
+const parseDate = (val) => {
+  if (!val) return null;
+  const iso = String(val).replace(' ', 'T');
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 const STATUS_TABS = ['ALL', 'PENDING', 'OPEN', 'RESERVED', 'PICKED', 'PACKED', 'SHIPPED', 'CANCELLED'];
 
 async function exportOrdersToExcel(orders) {
@@ -60,7 +68,7 @@ async function exportOrdersToExcel(orders) {
       soNumber: o.soNumber ?? '',
       customerName: o.customerName ?? '',
       status: o.status ?? o.state ?? '',
-      createdAt: o.createdAt ? format(new Date(o.createdAt), 'dd MMM yyyy HH:mm') : '',
+      createdAt: o.createdAt ? format(parseDate(o.createdAt), 'dd MMM yyyy HH:mm') : '',
     })),
   });
   toast.success('Orders exported to Excel');
@@ -165,8 +173,8 @@ export default function OrdersPage() {
       );
     }
     list = [...list].sort((a, b) => {
-      const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
-      const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+      const aTime = a.createdAt ? parseDate(a.createdAt)?.getTime() ?? 0 : 0;
+      const bTime = b.createdAt ? parseDate(b.createdAt)?.getTime() ?? 0 : 0;
       if (sortBy === 'oldest') return aTime - bTime;
       if (sortBy === 'customer') return String(a.customerName ?? '').localeCompare(String(b.customerName ?? ''));
       return bTime - aTime;
@@ -383,7 +391,7 @@ export default function OrdersPage() {
                     <TableCell className="font-medium">{order.customerName}</TableCell>
                     <TableCell><StatusBadge status={order.status ?? order.state} /></TableCell>
                     <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                      {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yyyy') : '-'}
+                      {order.createdAt ? format(parseDate(order.createdAt), 'dd MMM yyyy') : '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-1">
@@ -444,7 +452,7 @@ export default function OrdersPage() {
                         <Badge variant="outline" className="text-[10px]">{order.soNumber ?? 'N/A'}</Badge>
                       </div>
                       <p className="mt-2 text-[11px] text-muted-foreground">
-                        {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yyyy') : '-'}
+                        {order.createdAt ? format(parseDate(order.createdAt), 'dd MMM yyyy') : '-'}
                       </p>
                       <div className="mt-2 flex items-center gap-1.5">
                         <Drawer>

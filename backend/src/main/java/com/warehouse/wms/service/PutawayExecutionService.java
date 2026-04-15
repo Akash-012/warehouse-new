@@ -64,8 +64,13 @@ public class PutawayExecutionService {
         BigDecimal itemVolume = dimension.getLengthCm().multiply(dimension.getWidthCm()).multiply(dimension.getHeightCm());
         BigDecimal itemWeight = dimension.getWeightG();
 
-        BigDecimal freeVolume = scannedBin.getVolumeCm3().subtract(scannedBin.getOccupiedVolumeCm3());
-        BigDecimal freeWeight = scannedBin.getMaxWeightG().subtract(scannedBin.getOccupiedWeightG());
+        BigDecimal currentOccVol    = scannedBin.getOccupiedVolumeCm3() != null ? scannedBin.getOccupiedVolumeCm3() : BigDecimal.ZERO;
+        BigDecimal currentOccWeight  = scannedBin.getOccupiedWeightG()   != null ? scannedBin.getOccupiedWeightG()   : BigDecimal.ZERO;
+        BigDecimal binVolume         = scannedBin.getVolumeCm3()         != null ? scannedBin.getVolumeCm3()         : BigDecimal.valueOf(Long.MAX_VALUE);
+        BigDecimal binMaxWeight      = scannedBin.getMaxWeightG()        != null ? scannedBin.getMaxWeightG()        : BigDecimal.valueOf(Long.MAX_VALUE);
+
+        BigDecimal freeVolume  = binVolume.subtract(currentOccVol);
+        BigDecimal freeWeight  = binMaxWeight.subtract(currentOccWeight);
         if (freeVolume.compareTo(itemVolume) < 0 || freeWeight.compareTo(itemWeight) < 0) {
             throw new InventoryStateException("Scanned bin does not have enough remaining capacity");
         }
@@ -75,11 +80,15 @@ public class PutawayExecutionService {
         inventory.setState(Inventory.InventoryState.AVAILABLE);
         inventoryRepository.save(inventory);
 
-        scannedBin.setOccupiedVolumeCm3(scannedBin.getOccupiedVolumeCm3().add(itemVolume));
-        scannedBin.setOccupiedWeightG(scannedBin.getOccupiedWeightG().add(itemWeight));
-        BigDecimal fillRatio = scannedBin.getOccupiedVolumeCm3().divide(scannedBin.getVolumeCm3(), 4, java.math.RoundingMode.HALF_UP);
+        scannedBin.setOccupiedVolumeCm3(currentOccVol.add(itemVolume));
+        scannedBin.setOccupiedWeightG(currentOccWeight.add(itemWeight));
+        BigDecimal fillRatio = binVolume.compareTo(BigDecimal.ZERO) > 0
+                ? scannedBin.getOccupiedVolumeCm3().divide(binVolume, 4, java.math.RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
         if (fillRatio.compareTo(new BigDecimal("0.95")) >= 0) {
             scannedBin.setStatus(Bin.BinStatus.FULL);
+        } else {
+            scannedBin.setStatus(Bin.BinStatus.AVAILABLE);
         }
         binRepository.save(scannedBin);
 

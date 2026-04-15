@@ -2,12 +2,12 @@
 export const dynamic = 'force-dynamic';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useFieldArray, useForm } from 'react-hook-form';
+import { useFieldArray, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { Download, Loader2, Package, Plus, Search, Trash2, X, ClipboardList, FilePlus } from 'lucide-react';
+import { Download, Loader2, Package, Plus, Search, Trash2, X, ClipboardList, FilePlus, Pencil } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import StatCard from '@/components/StatCard';
@@ -32,6 +32,7 @@ import { toast } from 'sonner';
 
 const receiveSchema = z.object({
   poId: z.coerce.number().int().positive('PO ID is required'),
+  priority: z.enum(['P1', 'P2', 'P3']).optional(),
   lines: z.array(z.object({
     skuCode: z.string().min(1, 'SKU code is required'),
     quantity: z.coerce.number().int().min(1, 'Minimum 1'),
@@ -50,12 +51,19 @@ const createPoSchema = z.object({
   })).min(1, 'At least one product is required'),
 });
 
+// Safely parse date strings including "yyyy-MM-dd HH:mm:ss" format
+const parseDate = (val) => {
+  if (!val) return null;
+  const iso = String(val).replace(' ', 'T');
+  const d = new Date(iso);
+  return isNaN(d.getTime()) ? null : d;
+};
+
 const normalizePoStatus = (status) => {
   const raw = String(status ?? '')
     .trim()
     .toUpperCase()
     .replace(/[\s-]+/g, '_');
-
   if (!raw) return '';
   if (raw === 'OPEN' || raw === 'NEW') return 'PENDING';
   if (raw.includes('PARTIAL')) return 'PARTIAL';
@@ -81,7 +89,7 @@ async function exportPOs(pos) {
       supplier: p.supplier ?? '',
       status: p.status ?? '',
       lineCount: p.lineCount ?? p.lines?.length ?? 0,
-      createdAt: p.createdAt ? format(new Date(p.createdAt), 'dd MMM yyyy') : '',
+      createdAt: p.createdAt ? format(parseDate(p.createdAt), 'dd MMM yyyy') : '',
     })),
   });
   toast.success('Purchase orders exported to Excel');
@@ -91,6 +99,8 @@ export default function InboundPage() {
   const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
   const [createPoOpen, setCreatePoOpen] = useState(false);
+  const [editPoOpen, setEditPoOpen] = useState(false);
+  const [editingPo, setEditingPo] = useState(null);
   const [grnResult, setGrnResult] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -106,8 +116,10 @@ export default function InboundPage() {
 
   const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(receiveSchema),
-    defaultValues: { poId: '', lines: [{ skuCode: '', quantity: 1, batchNo: '' }] },
+    defaultValues: { poId: '', priority: undefined, lines: [{ skuCode: '', quantity: 1, batchNo: '' }] },
   });
+
+  const receivePriority = useWatch({ control, name: 'priority', defaultValue: undefined });
 
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' });
 
@@ -160,6 +172,62 @@ export default function InboundPage() {
     onError: (err) => toast.error(err.response?.data?.detail || 'Failed to create PO'),
   });
 
+  const editPoSchema = z.object({
+    supplier: z.string().min(1, 'Supplier is required'),
+    expectedArrivalDate: z.string().optional(),
+    priority: z.enum(['P1', 'P2', 'P3']),
+    lines: z.array(z.object({
+      id: z.number().optional(),
+      skuId: z.coerce.number().int().positive('SKU ID is required'),
+      quantity: z.coerce.number().int().min(1, 'Minimum 1'),
+    })).min(1, 'At least one product is required'),
+  });
+
+  const {
+    register: registerEdit,
+    control: controlEdit,
+    handleSubmit: handleSubmitEdit,
+    reset: resetEdit,
+    setValue: setEditValue,
+    formState: { errors: errorsEdit },
+  } = useForm({
+    resolver: zodResolver(editPoSchema),
+    defaultValues: { supplier: '', expectedArrivalDate: '', priority: 'P2', lines: [] },
+  });
+
+  const { fields: editLines, append: appendEditLine, remove: removeEditLine } = useFieldArray({ control: controlEdit, name: 'lines' });
+  const editPriority = useWatch({ control: controlEdit, name: 'priority', defaultValue: 'P2' });
+
+  const editPoMutation = useMutation({
+    mutationFn: ({ id, payload }) => api.patch(`/purchase-orders/${id}`, payload),
+    onSuccess: async ({ data }) => {
+      toast.success(`PO ${data.poNumber} updated successfully`);
+      await queryClient.invalidateQueries({ queryKey: ['purchaseOrders'] });
+      setEditPoOpen(false);
+      setEditingPo(null);
+    },
+    onError: (err) => toast.error(err.response?.data?.detail || 'Failed to update PO'),
+  });
+
+  const openEditPo = async (po) => {
+    // Fetch full PO detail to get lines with skuId
+    let detail = po;
+    try {
+      const res = await api.get(`/purchase-orders/${po.id}`);
+      detail = res.data;
+    } catch {
+      // fall back to list data
+    }
+    setEditingPo(detail);
+    resetEdit({
+      supplier: detail.supplier ?? '',
+      expectedArrivalDate: detail.expectedArrivalDate ?? '',
+      priority: detail.priority ?? 'P2',
+      lines: (detail.lines ?? []).map((l) => ({ id: l.id, skuId: l.skuId, quantity: l.quantity })),
+    });
+    setEditPoOpen(true);
+  };
+
   const selectablePOs = useMemo(
     () => (purchaseOrders ?? []).filter((p) => normalizePoStatus(p.status) !== 'RECEIVED'),
     [purchaseOrders]
@@ -177,7 +245,7 @@ export default function InboundPage() {
     if (!selectedPO) return;
     const lines = (selectedPO.lines ?? []).map((line) => ({
       skuCode: line.skuCode,
-      quantity: line.orderedQuantity ?? 1,
+      quantity: line.quantity ?? 1,
       batchNo: '',
     }));
     reset({
@@ -379,7 +447,7 @@ export default function InboundPage() {
                         toast.error('Please select a purchase order');
                         return;
                       }
-                      receiveMutation.mutate({ ...d, poId });
+                      receiveMutation.mutate({ ...d, poId, priority: d.priority || undefined });
                     })}
                     className="space-y-4"
                   >
@@ -406,6 +474,21 @@ export default function InboundPage() {
                       <p className="text-xs text-muted-foreground">PO lines auto-load after selection. Only non-received POs are listed.</p>
                       {errors.poId && <p className="text-xs text-destructive">{errors.poId.message}</p>}
                     </div>
+                    {/* Priority */}
+                    <div className="space-y-1.5">
+                      <Label>Priority <span className="text-muted-foreground text-xs">(optional — overrides PO priority)</span></Label>
+                      <Select value={receivePriority ?? ''} onValueChange={(v) => setValue('priority', v || undefined, { shouldValidate: true })}>
+                        <SelectTrigger className="h-10">
+                          <SelectValue placeholder="Keep existing priority" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="P1">P1 — High</SelectItem>
+                          <SelectItem value="P2">P2 — Medium</SelectItem>
+                          <SelectItem value="P3">P3 — Low</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     <Separator />
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
@@ -456,6 +539,101 @@ export default function InboundPage() {
                   </form>
                 )}
       </SlideOverForm>
+
+      {/* Edit PO Sheet — only for PENDING/OPEN POs */}
+      <SlideOverForm
+        open={editPoOpen}
+        onOpenChange={(v) => { setEditPoOpen(v); if (!v) setEditingPo(null); }}
+        title={`Edit PO — ${editingPo?.poNumber ?? ''}`}
+        description="Only PENDING purchase orders can be edited. You can update quantities, add new lines, or change priority."
+      >
+        <form
+          onSubmit={handleSubmitEdit((d) => {
+            editPoMutation.mutate({
+              id: editingPo.id,
+              payload: {
+                supplier: d.supplier,
+                expectedArrivalDate: d.expectedArrivalDate || undefined,
+                priority: d.priority,
+                lines: d.lines.map((l) => ({
+                  id: l.id || undefined,
+                  skuId: Number(l.skuId),
+                  quantity: Number(l.quantity),
+                })),
+              },
+            });
+          })}
+          className="space-y-4"
+        >
+          <div className="space-y-1.5">
+            <Label>Supplier</Label>
+            <Input className="h-10" {...registerEdit('supplier')} />
+            {errorsEdit.supplier && <p className="text-xs text-destructive">{errorsEdit.supplier.message}</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Expected Arrival Date</Label>
+            <Input type="date" className="h-10" {...registerEdit('expectedArrivalDate')} />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label>Priority</Label>
+            <Select
+              value={editPriority}
+              onValueChange={(v) => setEditValue('priority', v, { shouldValidate: true })}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="P1">P1 — High</SelectItem>
+                <SelectItem value="P2">P2 — Medium</SelectItem>
+                <SelectItem value="P3">P3 — Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label>Product Lines</Label>
+              <Button type="button" size="sm" variant="outline" onClick={() => appendEditLine({ skuId: '', quantity: 1 })}>
+                <Plus className="size-3.5 mr-1" /> Add Line
+              </Button>
+            </div>
+            {editLines.map((field, i) => (
+              <div key={field.id} className="rounded-xl border border-border/60 p-3 space-y-2 relative">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">SKU ID</Label>
+                    <Input type="number" min={1} className="h-8 text-sm" {...registerEdit(`lines.${i}.skuId`)} />
+                    {errorsEdit.lines?.[i]?.skuId && <p className="text-[10px] text-destructive">{errorsEdit.lines[i].skuId.message}</p>}
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Quantity</Label>
+                    <Input type="number" min={1} className="h-8 text-sm" {...registerEdit(`lines.${i}.quantity`)} />
+                    {errorsEdit.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errorsEdit.lines[i].quantity.message}</p>}
+                  </div>
+                </div>
+                {editLines.length > 1 && (
+                  <button type="button" onClick={() => removeEditLine(i)} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive">
+                    <Trash2 className="size-3.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          <SheetFooter>
+            <Button type="button" variant="outline" onClick={() => setEditPoOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={editPoMutation.isPending}>
+              {editPoMutation.isPending && <Loader2 className="size-3.5 mr-2 animate-spin" />}
+              Save Changes
+            </Button>
+          </SheetFooter>
+        </form>
+      </SlideOverForm>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard title="Total POs"     value={stats.total}    icon={Package} kpiVariant="blue"   accentClass="text-blue-500"   iconBg="bg-blue-500/10" />
         <StatCard title="Pending"       value={stats.pending}  icon={Package} kpiVariant="amber"  accentClass="text-amber-500"  iconBg="bg-amber-500/10" />
@@ -490,6 +668,7 @@ export default function InboundPage() {
             <TableRow className="hover:bg-transparent bg-muted/20">
               <TableHead>PO Number</TableHead>
               <TableHead>Supplier</TableHead>
+              <TableHead>Priority</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Lines</TableHead>
               <TableHead>Date</TableHead>
@@ -508,26 +687,42 @@ export default function InboundPage() {
                 <TableRow key={po.id} className="table-row-hover">
                   <TableCell className="font-bold font-mono text-primary">{po.poNumber}</TableCell>
                   <TableCell className="font-medium">{po.supplier || '—'}</TableCell>
+                  <TableCell>
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                      po.priority === 'P1' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                      po.priority === 'P3' ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' :
+                      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                    }`}>
+                      {po.priority ?? 'P2'}
+                    </span>
+                  </TableCell>
                   <TableCell><StatusBadge status={normalizePoStatus(po.status)} /></TableCell>
                   <TableCell className="font-semibold">{po.lineCount ?? po.lines?.length ?? '—'}</TableCell>
                   <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                     {(po.createdAt || po.expectedArrivalDate)
-                      ? format(new Date(po.createdAt || po.expectedArrivalDate), 'dd MMM yyyy')
+                      ? format(parseDate(po.createdAt || po.expectedArrivalDate), 'dd MMM yyyy HH:mm')
                       : '—'}
                   </TableCell>
                   <TableCell className="text-right">
-                    {normalizePoStatus(po.status) !== 'RECEIVED' && (
-                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
-                        const poId = String(po.id ?? '');
-                        setSelectedPoId(poId);
-                        setValue('poId', Number(poId));
-                        reset({ poId: Number(poId), lines: [{ skuCode: '', quantity: 1, batchNo: '' }] });
-                        setGrnResult(null);
-                        setOpen(true);
-                      }}>
-                        <Package className="size-3 mr-1" /> Receive
-                      </Button>
-                    )}
+                    <div className="flex items-center justify-end gap-1">
+                      {['PENDING', 'OPEN'].includes(normalizePoStatus(po.status)) && (
+                        <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => openEditPo(po)}>
+                          <Pencil className="size-3 mr-1" /> Edit
+                        </Button>
+                      )}
+                      {normalizePoStatus(po.status) !== 'RECEIVED' && (
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                          const poId = String(po.id ?? '');
+                          setSelectedPoId(poId);
+                          setValue('poId', Number(poId));
+                          reset({ poId: Number(poId), lines: [{ skuCode: '', quantity: 1, batchNo: '' }] });
+                          setGrnResult(null);
+                          setOpen(true);
+                        }}>
+                          <Package className="size-3 mr-1" /> Receive
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))

@@ -10,11 +10,14 @@ import java.util.Optional;
 
 public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Long> {
 
-    @Query("SELECT p.id, p.poNumber, p.supplier, p.status, COUNT(l), p.expectedArrivalDate " +
+    @Query("SELECT p.id, p.poNumber, p.supplier, p.status, COUNT(l), p.expectedArrivalDate, p.priority, p.createdAt " +
            "FROM PurchaseOrder p LEFT JOIN p.lines l " +
-           "GROUP BY p.id, p.poNumber, p.supplier, p.status, p.expectedArrivalDate " +
+           "GROUP BY p.id, p.poNumber, p.supplier, p.status, p.expectedArrivalDate, p.priority, p.createdAt " +
            "ORDER BY p.id DESC")
     List<Object[]> findAllSummary();
+
+    @Query("SELECT DISTINCT p FROM PurchaseOrder p LEFT JOIN FETCH p.lines l LEFT JOIN FETCH l.sku ORDER BY p.id DESC")
+    List<PurchaseOrder> findAllWithLines();
 
     @Query("SELECT DISTINCT p FROM PurchaseOrder p " +
            "LEFT JOIN FETCH p.lines l " +

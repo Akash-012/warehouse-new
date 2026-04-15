@@ -40,7 +40,7 @@ public class PackingService {
         SalesOrder order = Optional.ofNullable(compartment.getSalesOrder())
                 .orElseThrow(() -> new InventoryStateException("Compartment is not assigned to any order"));
 
-        List<Inventory> picked = inventoryRepository.findAll().stream()
+        List<Inventory> picked = inventoryRepository.findAllWithDetails().stream()
                 .filter(i -> i.getState() == Inventory.InventoryState.PICKED)
                 .filter(i -> order.getLines().stream().anyMatch(line -> line.getSku().getId().equals(i.getSku().getId())))
                 .toList();
@@ -78,7 +78,7 @@ public class PackingService {
         Set<String> scanned = packedBarcodesByOrder.computeIfAbsent(order.getId(), id -> ConcurrentHashMap.newKeySet());
         scanned.add(itemBarcode);
 
-        List<Inventory> orderPickedItems = inventoryRepository.findAll().stream()
+        List<Inventory> orderPickedItems = inventoryRepository.findAllWithDetails().stream()
                 .filter(i -> i.getState() == Inventory.InventoryState.PICKED)
                 .filter(i -> order.getLines().stream().anyMatch(line -> line.getSku().getId().equals(i.getSku().getId())))
                 .toList();
@@ -107,7 +107,7 @@ public class PackingService {
                 .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + orderId));
 
         Set<String> scanned = packedBarcodesByOrder.getOrDefault(orderId, Set.of());
-        int expected = inventoryRepository.findAll().stream()
+        int expected = inventoryRepository.findAllWithDetails().stream()
                 .filter(i -> order.getLines().stream().anyMatch(line -> line.getSku().getId().equals(i.getSku().getId())))
                 .filter(i -> i.getState() == Inventory.InventoryState.PICKED || i.getState() == Inventory.InventoryState.PACKED)
                 .toList().size();

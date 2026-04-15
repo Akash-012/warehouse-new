@@ -17,7 +17,7 @@ public interface BinRepository extends JpaRepository<Bin, Long> {
      * @param weightRequired The required weight.
      * @return A list of bins with sufficient capacity.
      */
-    @Query("SELECT b FROM Bin b WHERE b.status = 'AVAILABLE' AND (b.volumeCm3 - b.occupiedVolumeCm3) >= :volRequired AND (b.maxWeightG - b.occupiedWeightG) >= :weightRequired ORDER BY b.occupiedVolumeCm3 DESC")
+    @Query("SELECT b FROM Bin b WHERE b.status = com.warehouse.wms.entity.Bin.BinStatus.AVAILABLE AND (b.lengthCm * b.widthCm * b.heightCm - b.occupiedVolumeCm3) >= :volRequired AND (b.maxWeightG - b.occupiedWeightG) >= :weightRequired ORDER BY b.occupiedVolumeCm3 DESC")
     List<Bin> findBinsWithCapacity(@Param("volRequired") BigDecimal volRequired, @Param("weightRequired") BigDecimal weightRequired);
 
     java.util.Optional<Bin> findByBarcode(String barcode);

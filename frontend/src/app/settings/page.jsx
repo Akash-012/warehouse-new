@@ -220,8 +220,8 @@ export default function SettingsPage() {
         <TabsList className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 w-full h-auto gap-1 sm:gap-2 p-1 mb-4 sm:mb-6">
           <TabsTrigger value="account" className="text-xs sm:text-sm"><User className="size-3 sm:size-3.5 mr-1 sm:mr-1.5" /><span className="hidden xs:inline">Account</span></TabsTrigger>
           <TabsTrigger value="warehouse" className="text-xs sm:text-sm"><Warehouse className="size-3 sm:size-3.5 mr-1 sm:mr-1.5" /><span className="hidden sm:inline">Warehouse</span></TabsTrigger>
-          <TabsTrigger value="preferences" className="text-xs sm:text-sm"><Palette className="size-3 sm:size-3.5 mr-1 sm:mr-1.5" /><span className="hidden md:inline">Prefs</span></TabsTrigger>
-          <TabsTrigger value="notifications" className="text-xs sm:text-sm"><Bell className="size-3 sm:size-3.5 mr-1 sm:mr-1.5" /><span className="hidden lg:inline">Notif</span></TabsTrigger>
+          <TabsTrigger value="preferences" className="text-xs sm:text-sm"><Palette className="size-3 sm:size-3.5 mr-1 sm:mr-1.5" /><span className="hidden md:inline">Preferences</span></TabsTrigger>
+          <TabsTrigger value="notifications" className="text-xs sm:text-sm"><Bell className="size-3 sm:size-3.5 mr-1 sm:mr-1.5" /><span className="hidden lg:inline">Notification</span></TabsTrigger>
           <TabsTrigger value="system" className="text-xs sm:text-sm"><Server className="size-3 sm:size-3.5 mr-1 sm:mr-1.5" /><span className="hidden lg:inline">System</span></TabsTrigger>
         </TabsList>
 

@@ -7,20 +7,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
-    /**
-     * Finds available inventory for a given SKU, ordered by creation date (FIFO).
-     * @param skuId The ID of the SKU.
-     * @return A list of available inventory.
-     */
-    @Query("SELECT i FROM Inventory i WHERE i.sku.id = :skuId AND i.state = 'AVAILABLE' ORDER BY i.createdAt ASC")
-    List<Inventory> findAvailableBySkuFifo(@Param("skuId") Long skuId);
+    @Query("SELECT DISTINCT i FROM Inventory i JOIN FETCH i.sku LEFT JOIN FETCH i.bin ORDER BY i.id DESC")
+    List<Inventory> findAllWithDetails();
 
-    List<Inventory> findByGoodsReceiptLineGoodsReceiptIdAndState(Long goodsReceiptId, Inventory.InventoryState state);
-
-    java.util.Optional<Inventory> findBySerialNo(String serialNo);
+    Optional<Inventory> findBySerialNo(String serialNo);
 
     long countBySkuIdAndBatchNo(Long skuId, String batchNo);
 
@@ -30,12 +24,18 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
 
     List<Inventory> findByStateAndBinBarcode(Inventory.InventoryState state, String barcode);
 
-    List<Inventory> findByStateAndUpdatedAtBetween(Inventory.InventoryState state, java.time.LocalDateTime from, java.time.LocalDateTime to);
+    List<Inventory> findByStateAndUpdatedAtBetween(Inventory.InventoryState state,
+            java.time.LocalDateTime from, java.time.LocalDateTime to);
 
     @Modifying
     @Query("UPDATE Inventory i SET i.state = :toState WHERE i.id IN :ids")
-    int bulkUpdateState(@Param("ids") List<Long> ids, @Param("toState") Inventory.InventoryState toState);
+    int bulkUpdateState(@Param("ids") List<Long> ids,
+            @Param("toState") Inventory.InventoryState toState);
 
-    @Query("SELECT COUNT(i) FROM Inventory i WHERE i.goodsReceiptLine.goodsReceipt.purchaseOrder.id = :poId AND i.sku.id = :skuId")
+    /** Count items already received for a PO+SKU combination (excludes SHIPPED to allow re-receiving). */
+    @Query("SELECT COUNT(i) FROM Inventory i " +
+           "WHERE i.goodsReceiptLine.goodsReceipt.purchaseOrder.id = :poId " +
+           "AND i.sku.id = :skuId " +
+           "AND i.state <> com.warehouse.wms.entity.Inventory.InventoryState.SHIPPED")
     long countReceivedForPurchaseOrderSku(@Param("poId") Long poId, @Param("skuId") Long skuId);
 }

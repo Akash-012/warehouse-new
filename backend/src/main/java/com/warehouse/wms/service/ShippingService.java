@@ -36,7 +36,7 @@ public class ShippingService {
         }
 
         List<Long> skuIds = order.getLines().stream().map(line -> line.getSku().getId()).toList();
-        List<Inventory> packedItems = inventoryRepository.findAll().stream()
+        List<Inventory> packedItems = inventoryRepository.findAllWithDetails().stream()
                 .filter(i -> i.getState() == Inventory.InventoryState.PACKED)
                 .filter(i -> skuIds.contains(i.getSku().getId()))
                 .toList();

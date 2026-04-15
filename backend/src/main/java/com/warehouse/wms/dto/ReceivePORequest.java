@@ -1,5 +1,6 @@
 package com.warehouse.wms.dto;
 
+import com.warehouse.wms.entity.PurchaseOrder;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
@@ -11,6 +12,8 @@ import java.util.List;
 public class ReceivePORequest {
     @NotNull(message = "poId is required")
     private Long poId;
+
+    private PurchaseOrder.Priority priority;
 
     @Valid
     @NotEmpty(message = "lines are required")

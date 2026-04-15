@@ -7,6 +7,8 @@ import com.warehouse.wms.entity.User;
 import com.warehouse.wms.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -45,15 +47,30 @@ public class UserService {
 
     public UserResponse update(Long id, UpdateUserRequest req) {
         User user = findOrThrow(id);
+
+        // Only SUPER_ADMIN may change a user's role
         if (req.getRole() != null && !req.getRole().isBlank()) {
+            requireSuperAdmin("Only SUPER_ADMIN can change user roles");
             user.setRole(roleService.findByNameOrThrow(req.getRole()));
         }
+
+        // SUPER_ADMIN or the user themselves can update username
+        if (req.getUsername() != null && !req.getUsername().isBlank()) {
+            requireSuperAdmin("Only SUPER_ADMIN can update usernames");
+            if (!req.getUsername().equals(user.getUsername())
+                    && userRepository.findByUsername(req.getUsername()).isPresent()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Username already taken");
+            }
+            user.setUsername(req.getUsername());
+        }
+
         if (req.getPassword() != null && !req.getPassword().isBlank()) {
             if (req.getPassword().length() < 8) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must be at least 8 characters");
             }
             user.setPassword(passwordEncoder.encode(req.getPassword()));
         }
+
         return toResponse(userRepository.save(user));
     }
 
@@ -65,6 +82,15 @@ public class UserService {
     }
 
     // ── helpers ──────────────────────────────────────────────────────────────
+
+    private void requireSuperAdmin(String message) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        boolean isSuperAdmin = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_SUPER_ADMIN"));
+        if (!isSuperAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, message);
+        }
+    }
 
     private User findOrThrow(Long id) {
         return userRepository.findById(id)

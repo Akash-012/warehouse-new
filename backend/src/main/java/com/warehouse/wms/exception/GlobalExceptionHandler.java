@@ -61,4 +61,13 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
+
+    @ExceptionHandler(PoNotEditableException.class)
+    public ProblemDetail handlePoNotEditable(PoNotEditableException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
+        problemDetail.setTitle("PO Not Editable");
+        problemDetail.setType(URI.create("https://api.warehouse.com/errors/po-not-editable"));
+        problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
+    }
 }

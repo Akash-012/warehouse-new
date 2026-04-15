@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import PageHeader from '@/components/PageHeader';
 import PermissionGate from '@/components/PermissionGate';
+import { usePermissions } from '@/lib/hooks/usePermissions';
 import api from '@/lib/api';
 import { P } from '@/lib/permissions';
 import { Button } from '@/components/ui/button';
@@ -11,16 +12,19 @@ import { Badge } from '@/components/ui/badge';
 import { SheetFooter } from '@/components/ui/sheet';
 import SlideOverForm from '@/components/ui/SlideOverForm';
 import DynamicFormFields from '@/components/ui/DynamicFormFields';
-import { Plus } from 'lucide-react';
+import { Plus, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UsersPage() {
   const queryClient = useQueryClient();
+  const { role: currentUserRole } = usePermissions();
+  const isSuperAdmin = currentUserRole === 'SUPER_ADMIN';
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('');
   const [editingUserId, setEditingUserId] = useState(null);
   const [editingRole, setEditingRole] = useState('');
+  const [editingUsername, setEditingUsername] = useState('');
   const [createOpen, setCreateOpen] = useState(false);
 
   const { data: users = [], isLoading } = useQuery({
@@ -72,7 +76,7 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message ?? 'Failed to create user');
+      toast.error(error?.response?.data?.detail ?? error?.response?.data?.message ?? 'Failed to create user');
     },
   });
 
@@ -85,7 +89,7 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message ?? 'Failed to update user');
+      toast.error(error?.response?.data?.detail ?? error?.response?.data?.message ?? 'Failed to update user');
     },
   });
 
@@ -96,7 +100,7 @@ export default function UsersPage() {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     onError: (error) => {
-      toast.error(error?.response?.data?.message ?? 'Failed to delete user');
+      toast.error(error?.response?.data?.detail ?? error?.response?.data?.message ?? 'Failed to delete user');
     },
   });
 
@@ -145,8 +149,8 @@ export default function UsersPage() {
           <table className="w-full text-sm">
             <thead className="bg-muted/50">
               <tr>
-                <th className="px-3 py-2 text-left">Username</th>
                 <th className="px-3 py-2 text-left">Role</th>
+                <th className="px-3 py-2 text-left">Username</th>
                 <th className="px-3 py-2 text-left">Permissions</th>
                 <th className="px-3 py-2 text-right">Actions</th>
               </tr>
@@ -158,20 +162,45 @@ export default function UsersPage() {
                 <tr><td className="px-3 py-3" colSpan={4}>No users found.</td></tr>
               ) : users.map((u) => (
                 <tr key={u.id} className="border-t">
-                  <td className="px-3 py-2">{u.username}</td>
                   <td className="px-3 py-2">
                     {editingUserId === u.id ? (
-                      <select
-                        className="h-8 rounded-md border border-input bg-background px-2"
-                        value={editingRole}
-                        onChange={(e) => setEditingRole(e.target.value)}
-                      >
-                        {sortedRoles.map((name) => (
-                          <option key={name} value={name}>{name}</option>
-                        ))}
-                      </select>
+                      isSuperAdmin ? (
+                        <select
+                          className="h-8 rounded-md border border-input bg-background px-2"
+                          value={editingRole}
+                          onChange={(e) => setEditingRole(e.target.value)}
+                        >
+                          {sortedRoles.map((name) => (
+                            <option key={name} value={name}>{name}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                          <ShieldAlert className="size-3.5 text-amber-500" />
+                          <Badge variant="secondary">{u.role}</Badge>
+                          <span className="text-[10px]">(SUPER_ADMIN only)</span>
+                        </span>
+                      )
                     ) : (
                       <Badge variant="secondary">{u.role}</Badge>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    {editingUserId === u.id ? (
+                      isSuperAdmin ? (
+                        <input
+                          className="h-8 rounded-md border border-input bg-background px-2 text-sm"
+                          value={editingUsername}
+                          onChange={(e) => setEditingUsername(e.target.value)}
+                        />
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-xs">
+                          {u.username}
+                          <span className="text-[10px] text-muted-foreground">(read-only)</span>
+                        </span>
+                      )
+                    ) : (
+                      u.username
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -186,18 +215,25 @@ export default function UsersPage() {
                           <>
                             <Button
                               size="sm"
-                              onClick={() => updateUser.mutate({ id: u.id, payload: { role: editingRole } })}
+                              onClick={() => {
+                                const payload = {};
+                                if (isSuperAdmin) {
+                                  if (editingRole) payload.role = editingRole;
+                                  if (editingUsername) payload.username = editingUsername;
+                                }
+                                updateUser.mutate({ id: u.id, payload });
+                              }}
                               disabled={updateUser.isPending}
                             >
                               Save
                             </Button>
-                            <Button size="sm" variant="outline" onClick={() => { setEditingUserId(null); setEditingRole(''); }}>
+                            <Button size="sm" variant="outline" onClick={() => { setEditingUserId(null); setEditingRole(''); setEditingUsername(''); }}>
                               Cancel
                             </Button>
                           </>
                         ) : (
                           <>
-                            <Button size="sm" variant="outline" onClick={() => { setEditingUserId(u.id); setEditingRole(u.role); }}>
+                            <Button size="sm" variant="outline" onClick={() => { setEditingUserId(u.id); setEditingRole(u.role); setEditingUsername(u.username); }}>
                               Edit
                             </Button>
                             <Button size="sm" variant="destructive" onClick={() => deleteUser.mutate(u.id)} disabled={deleteUser.isPending}>

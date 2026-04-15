@@ -142,12 +142,12 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <div className="relative group">
-                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors group-focus-within:text-primary">
+                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary">
                     <UserRound className="size-4" />
                   </span>
                   <Input
                     id="username"
-                    className="h-11 rounded-xl border-border/80 bg-background/80 pl-11 pr-3 text-sm shadow-sm transition-all focus-visible:ring-2"
+                    className="h-11 rounded-xl border-border/80 bg-background/80 pl-10 pr-3 text-sm shadow-sm transition-all focus-visible:ring-2"
                     {...register("username")}
                   />
                 </div>
@@ -161,13 +161,13 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative group">
-                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 inline-flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground transition-colors group-focus-within:text-primary">
+                  <span className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary">
                     <LockKeyhole className="size-4" />
                   </span>
                   <Input
                     id="password"
                     type={showPassword ? "text" : "password"}
-                    className="h-11 rounded-xl border-border/80 bg-background/80 pl-12 pr-14 text-sm shadow-sm transition-all focus-visible:ring-2"
+                    className="h-11 rounded-xl border-border/80 bg-background/80 pl-10 pr-10 text-sm shadow-sm transition-all focus-visible:ring-2"
                     {...register("password")}
                   />
                   <button
@@ -176,7 +176,7 @@ export default function LoginPage() {
                     aria-label={
                       showPassword ? "Hide password" : "Show password"
                     }
-                    className="absolute right-2 top-1/2 z-10 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-muted-foreground transition-colors hover:border-border hover:bg-muted/70 hover:text-foreground"
+                    className="absolute right-3 top-1/2 z-10 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground"
                   >
                     {showPassword ? (
                       <EyeOff className="size-4" />

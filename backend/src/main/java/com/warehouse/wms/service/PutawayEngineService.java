@@ -5,7 +5,6 @@ import com.warehouse.wms.entity.Bin;
 import com.warehouse.wms.entity.Inventory;
 import com.warehouse.wms.entity.PutawayTask;
 import com.warehouse.wms.entity.SkuDimension;
-import com.warehouse.wms.exception.InventoryStateException;
 import com.warehouse.wms.repository.BinRepository;
 import com.warehouse.wms.repository.InventoryRepository;
 import com.warehouse.wms.repository.PutawayTaskRepository;
@@ -39,8 +38,9 @@ public class PutawayEngineService {
         Bin overflow = ensureOverflowBin();
 
         for (Inventory inventory : receivedItems) {
-            if (inventory.getState() != Inventory.InventoryState.RECEIVED) {
-                throw new InventoryStateException("Inventory is not in RECEIVED state: " + inventory.getId());
+            // Skip if a task already exists for this inventory item
+            if (putawayTaskRepository.existsByInventoryId(inventory.getId())) {
+                continue;
             }
 
             SkuDimension dimension = skuDimensionRepository.findBySkuId(inventory.getSku().getId())

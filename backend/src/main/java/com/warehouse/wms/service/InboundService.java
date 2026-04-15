@@ -53,6 +53,10 @@ public class InboundService {
         PurchaseOrder po = purchaseOrderRepository.findById(request.getPoId())
                 .orElseThrow(() -> new EntityNotFoundException("Purchase order not found: " + request.getPoId()));
 
+        if (request.getPriority() != null) {
+            po.setPriority(request.getPriority());
+        }
+
         Bin receiveDock = ensureSpecialBin(RECEIVE_DOCK_BARCODE);
 
         GoodsReceipt goodsReceipt = new GoodsReceipt();
@@ -103,9 +107,10 @@ public class InboundService {
         goodsReceipt.setLines(grnLines);
         GoodsReceipt saved = goodsReceiptRepository.save(goodsReceipt);
 
-        boolean fullyReceived = po.getLines().stream().allMatch(poLine ->
-            inventoryRepository.countReceivedForPurchaseOrderSku(po.getId(), poLine.getSku().getId()) >= poLine.getQuantity()
-        );
+        boolean fullyReceived = po.getLines() != null && !po.getLines().isEmpty() &&
+            po.getLines().stream().allMatch(poLine ->
+                inventoryRepository.countReceivedForPurchaseOrderSku(po.getId(), poLine.getSku().getId()) >= poLine.getQuantity()
+            );
         po.setStatus(fullyReceived ? "RECEIVED" : "PARTIALLY_RECEIVED");
         purchaseOrderRepository.save(po);
 
