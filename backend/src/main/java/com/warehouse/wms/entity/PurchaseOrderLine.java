@@ -26,4 +26,13 @@ public class PurchaseOrderLine {
 
     @Column(nullable = false)
     private Integer quantity;
+
+    @Column(name = "unit_price", precision = 12, scale = 2)
+    private java.math.BigDecimal unitPrice;
+
+    @Column(name = "sgst_rate", precision = 5, scale = 2)
+    private java.math.BigDecimal sgstRate;
+
+    @Column(name = "cgst_rate", precision = 5, scale = 2)
+    private java.math.BigDecimal cgstRate;
 }

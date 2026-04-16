@@ -29,6 +29,10 @@ public class POResponse {
         private Long skuId;
         private String skuCode;
         private String skuDescription;
-        private Integer quantity;
+        private Integer quantity;       // ordered qty
+        private Integer receivedQty;    // total received across all GRNs
+        private java.math.BigDecimal unitPrice;
+        private java.math.BigDecimal sgstRate;
+        private java.math.BigDecimal cgstRate;
     }
 }

@@ -34,5 +34,14 @@ public class CreatePORequest {
         @NotNull(message = "Quantity is required")
         @Positive
         private Integer quantity;
+
+        @jakarta.validation.constraints.DecimalMin(value = "0.0", inclusive = true)
+        private java.math.BigDecimal unitPrice;
+
+        @jakarta.validation.constraints.DecimalMin(value = "0.0", inclusive = true)
+        private java.math.BigDecimal sgstRate;
+
+        @jakarta.validation.constraints.DecimalMin(value = "0.0", inclusive = true)
+        private java.math.BigDecimal cgstRate;
     }
 }

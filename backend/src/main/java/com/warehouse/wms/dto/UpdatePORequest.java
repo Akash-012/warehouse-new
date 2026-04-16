@@ -20,12 +20,16 @@ public class UpdatePORequest {
 
     @Data
     public static class LineItem {
-        private Long id;           // null = new line, non-null = update existing
+        private Long id;
 
         @Positive
         private Long skuId;
 
         @Positive
         private Integer quantity;
+
+        private java.math.BigDecimal unitPrice;
+        private java.math.BigDecimal sgstRate;
+        private java.math.BigDecimal cgstRate;
     }
 }

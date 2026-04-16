@@ -38,6 +38,11 @@ public class User implements UserDetails {
 
     /** Returns ROLE_<name> + every individual Permission granted to this role. */
     @Override
+    public String getUsername() {
+        return username;
+    }
+
+    @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         List<SimpleGrantedAuthority> authorities = new ArrayList<>();
         authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));

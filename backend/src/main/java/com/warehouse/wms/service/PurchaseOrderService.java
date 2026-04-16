@@ -7,6 +7,7 @@ import com.warehouse.wms.entity.PurchaseOrder;
 import com.warehouse.wms.entity.PurchaseOrderLine;
 import com.warehouse.wms.entity.Sku;
 import com.warehouse.wms.exception.PoNotEditableException;
+import com.warehouse.wms.repository.InventoryRepository;
 import com.warehouse.wms.repository.PurchaseOrderLineRepository;
 import com.warehouse.wms.repository.PurchaseOrderRepository;
 import com.warehouse.wms.repository.SkuRepository;
@@ -30,6 +31,7 @@ public class PurchaseOrderService {
     private final PurchaseOrderLineRepository purchaseOrderLineRepository;
     private final WarehouseRepository warehouseRepository;
     private final SkuRepository skuRepository;
+    private final InventoryRepository inventoryRepository;
 
     @Transactional
     public POResponse create(CreatePORequest request) {
@@ -76,18 +78,22 @@ public class PurchaseOrderService {
                         .orElseThrow(() -> new EntityNotFoundException("SKU not found: " + lineItem.getSkuId()));
 
                 if (lineItem.getId() != null) {
-                    // Update existing line
                     PurchaseOrderLine existing = purchaseOrderLineRepository.findById(lineItem.getId())
                             .orElseThrow(() -> new EntityNotFoundException("PO line not found: " + lineItem.getId()));
                     existing.setQuantity(lineItem.getQuantity());
                     existing.setSku(sku);
+                    if (lineItem.getUnitPrice() != null) existing.setUnitPrice(lineItem.getUnitPrice());
+                    if (lineItem.getSgstRate() != null) existing.setSgstRate(lineItem.getSgstRate());
+                    if (lineItem.getCgstRate() != null) existing.setCgstRate(lineItem.getCgstRate());
                     purchaseOrderLineRepository.save(existing);
                 } else {
-                    // Add new line
                     PurchaseOrderLine newLine = new PurchaseOrderLine();
                     newLine.setPurchaseOrder(po);
                     newLine.setSku(sku);
                     newLine.setQuantity(lineItem.getQuantity());
+                    newLine.setUnitPrice(lineItem.getUnitPrice());
+                    newLine.setSgstRate(lineItem.getSgstRate());
+                    newLine.setCgstRate(lineItem.getCgstRate());
                     purchaseOrderLineRepository.save(newLine);
                 }
             }
@@ -120,6 +126,9 @@ public class PurchaseOrderService {
             line.setPurchaseOrder(po);
             line.setSku(sku);
             line.setQuantity(item.getQuantity());
+            line.setUnitPrice(item.getUnitPrice());
+            line.setSgstRate(item.getSgstRate());
+            line.setCgstRate(item.getCgstRate());
             lines.add(line);
         }
         return lines;
@@ -133,6 +142,10 @@ public class PurchaseOrderService {
                         .skuCode(l.getSku().getSkuCode())
                         .skuDescription(l.getSku().getDescription())
                         .quantity(l.getQuantity())
+                        .receivedQty((int) inventoryRepository.countReceivedForPurchaseOrderSku(po.getId(), l.getSku().getId()))
+                        .unitPrice(l.getUnitPrice())
+                        .sgstRate(l.getSgstRate())
+                        .cgstRate(l.getCgstRate())
                         .build()).toList();
 
         return POResponse.builder()

@@ -48,6 +48,9 @@ const createPoSchema = z.object({
     skuId: z.coerce.number().int().positive('SKU ID is required'),
     skuName: z.string().optional(),
     quantity: z.coerce.number().int().min(1, 'Minimum 1'),
+    unitPrice: z.coerce.number().min(0, 'Must be ≥ 0').optional(),
+    sgstRate: z.coerce.number().min(0).max(100).optional(),
+    cgstRate: z.coerce.number().min(0).max(100).optional(),
   })).min(1, 'At least one product is required'),
 });
 
@@ -144,7 +147,7 @@ export default function InboundPage() {
     formState: { errors: errorsPo },
   } = useForm({
     resolver: zodResolver(createPoSchema),
-    defaultValues: { warehouseId: '', supplier: '', expectedArrivalDate: '', lines: [{ skuId: '', skuName: '', quantity: 1 }] },
+    defaultValues: { warehouseId: '', supplier: '', expectedArrivalDate: '', lines: [{ skuId: '', skuName: '', quantity: 1, unitPrice: '', sgstRate: '', cgstRate: '' }] },
   });
 
   const { fields: poLines, append: appendPoLine, remove: removePoLine } = useFieldArray({ control: controlPo, name: 'lines' });
@@ -180,6 +183,9 @@ export default function InboundPage() {
       id: z.number().optional(),
       skuId: z.coerce.number().int().positive('SKU ID is required'),
       quantity: z.coerce.number().int().min(1, 'Minimum 1'),
+      unitPrice: z.coerce.number().min(0).optional(),
+      sgstRate: z.coerce.number().min(0).max(100).optional(),
+      cgstRate: z.coerce.number().min(0).max(100).optional(),
     })).min(1, 'At least one product is required'),
   });
 
@@ -223,7 +229,7 @@ export default function InboundPage() {
       supplier: detail.supplier ?? '',
       expectedArrivalDate: detail.expectedArrivalDate ?? '',
       priority: detail.priority ?? 'P2',
-      lines: (detail.lines ?? []).map((l) => ({ id: l.id, skuId: l.skuId, quantity: l.quantity })),
+      lines: (detail.lines ?? []).map((l) => ({ id: l.id, skuId: l.skuId, quantity: l.quantity, unitPrice: l.unitPrice ?? '', sgstRate: l.sgstRate ?? '', cgstRate: l.cgstRate ?? '' })),
     });
     setEditPoOpen(true);
   };
@@ -243,11 +249,18 @@ export default function InboundPage() {
 
   useEffect(() => {
     if (!selectedPO) return;
-    const lines = (selectedPO.lines ?? []).map((line) => ({
-      skuCode: line.skuCode,
-      quantity: line.quantity ?? 1,
-      batchNo: '',
-    }));
+    const lines = (selectedPO.lines ?? []).map((line) => {
+      const alreadyReceived = line.receivedQty ?? 0;
+      const remaining = Math.max(1, (line.quantity ?? 1) - alreadyReceived);
+      return {
+        skuCode: line.skuCode,
+        quantity: remaining,
+        batchNo: '',
+        _ordered: line.quantity,
+        _alreadyReceived: alreadyReceived,
+        _remaining: remaining,
+      };
+    });
     reset({
       poId: selectedPO.id,
       lines: lines.length ? lines : [{ skuCode: '', quantity: 1, batchNo: '' }],
@@ -323,7 +336,13 @@ export default function InboundPage() {
               warehouseId: Number(d.warehouseId),
               supplier: d.supplier,
               expectedArrivalDate: d.expectedArrivalDate || undefined,
-              lines: d.lines.map((l) => ({ skuId: Number(l.skuId), quantity: Number(l.quantity) })),
+              lines: d.lines.map((l) => ({
+                skuId: Number(l.skuId),
+                quantity: Number(l.quantity),
+                unitPrice: l.unitPrice ? Number(l.unitPrice) : undefined,
+                sgstRate: l.sgstRate ? Number(l.sgstRate) : undefined,
+                cgstRate: l.cgstRate ? Number(l.cgstRate) : undefined,
+              })),
             };
             createPoMutation.mutate(payload);
           })}
@@ -364,7 +383,7 @@ export default function InboundPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>Products</Label>
-              <Button type="button" size="sm" variant="outline" onClick={() => appendPoLine({ skuId: '', skuName: '', quantity: 1 })}>
+              <Button type="button" size="sm" variant="outline" onClick={() => appendPoLine({ skuId: '', skuName: '', quantity: 1, unitPrice: '', sgstRate: '', cgstRate: '' })}>
                 <Plus className="size-3.5 mr-1" /> Add Product
               </Button>
             </div>
@@ -374,13 +393,7 @@ export default function InboundPage() {
                 <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">SKU ID</Label>
-                    <Input
-                      type="number"
-                      min={1}
-                      placeholder="e.g. 3"
-                      className="h-8 text-sm"
-                      {...registerPo(`lines.${i}.skuId`)}
-                    />
+                    <Input type="number" min={1} placeholder="e.g. 3" className="h-8 text-sm" {...registerPo(`lines.${i}.skuId`)} />
                     {errorsPo.lines?.[i]?.skuId && <p className="text-[10px] text-destructive">{errorsPo.lines[i].skuId.message}</p>}
                   </div>
                   <div className="space-y-1">
@@ -390,8 +403,22 @@ export default function InboundPage() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs">Product Name <span className="text-muted-foreground">(optional, for reference)</span></Label>
+                  <Label className="text-xs">Product Name <span className="text-muted-foreground">(optional)</span></Label>
                   <Input placeholder="e.g. Widget A" className="h-8 text-sm" {...registerPo(`lines.${i}.skuName`)} />
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Unit Price (₹)</Label>
+                    <Input type="number" min={0} step="0.01" placeholder="0.00" className="h-8 text-sm" {...registerPo(`lines.${i}.unitPrice`)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">SGST %</Label>
+                    <Input type="number" min={0} max={100} step="0.01" placeholder="9" className="h-8 text-sm" {...registerPo(`lines.${i}.sgstRate`)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">CGST %</Label>
+                    <Input type="number" min={0} max={100} step="0.01" placeholder="9" className="h-8 text-sm" {...registerPo(`lines.${i}.cgstRate`)} />
+                  </div>
                 </div>
                 {poLines.length > 1 && (
                   <button type="button" onClick={() => removePoLine(i)} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors">
@@ -499,6 +526,13 @@ export default function InboundPage() {
                       </div>
                       {fields.map((field, i) => (
                         <div key={field.id} className="rounded-xl border border-border/60 p-3 space-y-2.5 relative">
+                          {field._ordered != null && (
+                            <div className="flex gap-3 text-xs text-muted-foreground">
+                              <span>Ordered: <strong className="text-foreground">{field._ordered}</strong></span>
+                              <span>Received: <strong className="text-foreground">{field._alreadyReceived}</strong></span>
+                              <span>Remaining: <strong className="text-orange-500">{field._remaining}</strong></span>
+                            </div>
+                          )}
                           <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-1">
                               <Label className="text-xs">SKU Code</Label>
@@ -511,8 +545,14 @@ export default function InboundPage() {
                               {errors.lines?.[i]?.skuCode && <p className="text-[10px] text-destructive">{errors.lines[i].skuCode.message}</p>}
                             </div>
                             <div className="space-y-1">
-                              <Label className="text-xs">Quantity</Label>
-                              <Input type="number" min={1} className="h-8 text-sm" {...register(`lines.${i}.quantity`)} />
+                              <Label className="text-xs">Qty to Receive {field._remaining != null && <span className="text-muted-foreground">(max {field._remaining})</span>}</Label>
+                              <Input
+                                type="number"
+                                min={1}
+                                max={field._remaining ?? undefined}
+                                className="h-8 text-sm"
+                                {...register(`lines.${i}.quantity`)}
+                              />
                               {errors.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errors.lines[i].quantity.message}</p>}
                             </div>
                           </div>
@@ -559,6 +599,9 @@ export default function InboundPage() {
                   id: l.id || undefined,
                   skuId: Number(l.skuId),
                   quantity: Number(l.quantity),
+                  unitPrice: l.unitPrice ? Number(l.unitPrice) : undefined,
+                  sgstRate: l.sgstRate ? Number(l.sgstRate) : undefined,
+                  cgstRate: l.cgstRate ? Number(l.cgstRate) : undefined,
                 })),
               },
             });
@@ -598,7 +641,7 @@ export default function InboundPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>Product Lines</Label>
-              <Button type="button" size="sm" variant="outline" onClick={() => appendEditLine({ skuId: '', quantity: 1 })}>
+              <Button type="button" size="sm" variant="outline" onClick={() => appendEditLine({ skuId: '', quantity: 1, unitPrice: '', sgstRate: '', cgstRate: '' })}>
                 <Plus className="size-3.5 mr-1" /> Add Line
               </Button>
             </div>
@@ -614,6 +657,20 @@ export default function InboundPage() {
                     <Label className="text-xs">Quantity</Label>
                     <Input type="number" min={1} className="h-8 text-sm" {...registerEdit(`lines.${i}.quantity`)} />
                     {errorsEdit.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errorsEdit.lines[i].quantity.message}</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Unit Price (₹)</Label>
+                    <Input type="number" min={0} step="0.01" placeholder="0.00" className="h-8 text-sm" {...registerEdit(`lines.${i}.unitPrice`)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">SGST %</Label>
+                    <Input type="number" min={0} max={100} step="0.01" placeholder="9" className="h-8 text-sm" {...registerEdit(`lines.${i}.sgstRate`)} />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">CGST %</Label>
+                    <Input type="number" min={0} max={100} step="0.01" placeholder="9" className="h-8 text-sm" {...registerEdit(`lines.${i}.cgstRate`)} />
                   </div>
                 </div>
                 {editLines.length > 1 && (

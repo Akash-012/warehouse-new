@@ -39,6 +39,7 @@ import {
   Activity,
   TrendingUp,
   AlertCircle,
+  ClipboardList,
 } from 'lucide-react';
 
 const SIDEBAR_MIN       = 64;
@@ -52,6 +53,7 @@ const LS_FAVORITES_KEY  = 'wms-sidebar-favorites';
 const ALL_MENU_ITEMS = [
   { href: '/dashboard',   label: 'Dashboard',   icon: LayoutDashboard, group: 'Overview',    permission: P.DASHBOARD_VIEW  },
   { href: '/inbound',     label: 'Inbound',     icon: Package,         group: 'Operations',  permission: P.INBOUND_VIEW    },
+  { href: '/grn',         label: 'GRN',         icon: ClipboardList,   group: 'Operations',  permission: P.INBOUND_VIEW    },
   { href: '/putaway',     label: 'Putaway',     icon: Warehouse,       group: 'Operations',  permission: P.PUTAWAY_VIEW    },
   { href: '/inventory',   label: 'Inventory',   icon: Boxes,           group: 'Operations',  permission: P.INVENTORY_VIEW  },
   { href: '/orders',      label: 'Orders',      icon: ShoppingCart,    group: 'Fulfillment', permission: P.ORDERS_VIEW     },

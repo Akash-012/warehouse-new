@@ -127,27 +127,93 @@ public class InboundService {
     public GRNResponse getGRN(Long grnId) {
         GoodsReceipt grn = goodsReceiptRepository.findById(grnId)
                 .orElseThrow(() -> new EntityNotFoundException("GRN not found: " + grnId));
-
         int totalItems = grn.getLines().stream().mapToInt(GoodsReceiptLine::getQuantityReceived).sum();
         return toGrnResponse(grn, totalItems);
     }
 
+    @Transactional
+    public List<GRNResponse> listAllGRNs() {
+        return goodsReceiptRepository.findAll().stream()
+                .map(grn -> {
+                    int total = grn.getLines().stream().mapToInt(GoodsReceiptLine::getQuantityReceived).sum();
+                    return toGrnResponse(grn, total);
+                })
+                .toList();
+    }
+
     private GRNResponse toGrnResponse(GoodsReceipt grn, int totalItems) {
+        PurchaseOrder po = grn.getPurchaseOrder();
+        java.math.BigDecimal ZERO = java.math.BigDecimal.ZERO;
+
         List<GRNLineResponse> lines = grn.getLines().stream()
-                .map(line -> GRNLineResponse.builder()
-                        .skuId(line.getSku().getId())
-                        .skuCode(line.getSku().getSkuCode())
-                        .batchNo(line.getBatchNo())
-                        .quantity(line.getQuantityReceived())
-                        .build())
+                .map(line -> {
+                    PurchaseOrderLine poLine = po.getLines() == null ? null :
+                            po.getLines().stream()
+                                    .filter(pl -> pl.getSku().getId().equals(line.getSku().getId()))
+                                    .findFirst().orElse(null);
+
+                    Integer orderedQty = poLine != null ? poLine.getQuantity() : null;
+                    int received = line.getQuantityReceived();
+
+                    // pending = ordered - total received across ALL GRNs for this PO+SKU
+                    int totalReceivedForSku = orderedQty != null
+                            ? (int) inventoryRepository.countReceivedForPurchaseOrderSku(po.getId(), line.getSku().getId())
+                            : received;
+                    int pending = orderedQty != null ? Math.max(0, orderedQty - totalReceivedForSku) : 0;
+
+                    java.math.BigDecimal unitPrice = poLine != null && poLine.getUnitPrice() != null
+                            ? poLine.getUnitPrice() : ZERO;
+                    java.math.BigDecimal sgstRate = poLine != null && poLine.getSgstRate() != null ? poLine.getSgstRate() : ZERO;
+                    java.math.BigDecimal cgstRate = poLine != null && poLine.getCgstRate() != null ? poLine.getCgstRate() : ZERO;
+
+                    java.math.BigDecimal lineTotal = unitPrice.multiply(java.math.BigDecimal.valueOf(received));
+                    java.math.BigDecimal sgstAmt   = lineTotal.multiply(sgstRate).divide(java.math.BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                    java.math.BigDecimal cgstAmt   = lineTotal.multiply(cgstRate).divide(java.math.BigDecimal.valueOf(100), 2, java.math.RoundingMode.HALF_UP);
+                    java.math.BigDecimal gstAmt    = sgstAmt.add(cgstAmt);
+
+                    return GRNLineResponse.builder()
+                            .skuId(line.getSku().getId())
+                            .skuCode(line.getSku().getSkuCode())
+                            .skuDescription(line.getSku().getDescription())
+                            .batchNo(line.getBatchNo())
+                            .orderedQty(orderedQty)
+                            .receivedQty(received)
+                            .pendingQty(pending)
+                            .unitPrice(unitPrice)
+                            .lineTotal(lineTotal)
+                            .sgstRate(sgstRate)
+                            .cgstRate(cgstRate)
+                            .sgstAmount(sgstAmt)
+                            .cgstAmount(cgstAmt)
+                            .gstAmount(gstAmt)
+                            .lineTotalWithTax(lineTotal.add(gstAmt))
+                            .build();
+                })
                 .toList();
 
+        java.math.BigDecimal subTotal   = lines.stream().map(GRNLineResponse::getLineTotal).reduce(ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal totalSgst  = lines.stream().map(GRNLineResponse::getSgstAmount).reduce(ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal totalCgst  = lines.stream().map(GRNLineResponse::getCgstAmount).reduce(ZERO, java.math.BigDecimal::add);
+        java.math.BigDecimal totalGst   = totalSgst.add(totalCgst);
+        int totalOrdered = lines.stream().mapToInt(l -> l.getOrderedQty() != null ? l.getOrderedQty() : 0).sum();
+        int totalPending = lines.stream().mapToInt(l -> l.getPendingQty() != null ? l.getPendingQty() : 0).sum();
+
         return GRNResponse.builder()
+                .id(grn.getId())
                 .grnNo(grn.getGrnNo())
-                .purchaseOrderId(grn.getPurchaseOrder().getId())
+                .purchaseOrderId(po.getId())
+                .poNumber(po.getPoNumber())
+                .supplier(po.getSupplier())
                 .lines(lines)
                 .totalItems(totalItems)
+                .totalOrdered(totalOrdered)
+                .totalPending(totalPending)
                 .createdAt(grn.getCreatedAt())
+                .subTotal(subTotal)
+                .totalSgst(totalSgst)
+                .totalCgst(totalCgst)
+                .totalGst(totalGst)
+                .grandTotal(subTotal.add(totalGst))
                 .build();
     }
 

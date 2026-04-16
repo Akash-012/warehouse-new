@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/inbound")
 @RequiredArgsConstructor
@@ -21,6 +23,11 @@ public class InboundController {
     @PreAuthorize("hasAuthority('INBOUND_RECEIVE')")
     public ResponseEntity<GRNResponse> receivePO(@Valid @RequestBody ReceivePORequest request) {
         return ResponseEntity.ok(inboundService.receivePO(request));
+    }
+
+    @GetMapping("/grns")
+    public ResponseEntity<List<GRNResponse>> listGRNs() {
+        return ResponseEntity.ok(inboundService.listAllGRNs());
     }
 
     @GetMapping("/grn/{id}")
