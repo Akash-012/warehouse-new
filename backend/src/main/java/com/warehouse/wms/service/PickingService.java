@@ -4,12 +4,12 @@ import com.warehouse.wms.dto.ExecutionResult;
 import com.warehouse.wms.dto.PickScanRequest;
 import com.warehouse.wms.dto.PickTaskResponse;
 import com.warehouse.wms.dto.PickingSessionResponse;
-import com.warehouse.wms.dto.PickingSessionResponse.PickingSessionItem;
 import com.warehouse.wms.dto.PickingStartRequest;
 import com.warehouse.wms.entity.Inventory;
 import com.warehouse.wms.entity.MovementLog;
 import com.warehouse.wms.entity.PickTask;
 import com.warehouse.wms.entity.RackCompartment;
+import com.warehouse.wms.entity.SalesOrder;
 import com.warehouse.wms.entity.SkuDimension;
 import com.warehouse.wms.entity.Trolley;
 import com.warehouse.wms.exception.InventoryStateException;
@@ -18,6 +18,7 @@ import com.warehouse.wms.repository.InventoryRepository;
 import com.warehouse.wms.repository.MovementLogRepository;
 import com.warehouse.wms.repository.PickTaskRepository;
 import com.warehouse.wms.repository.RackCompartmentRepository;
+import com.warehouse.wms.repository.SalesOrderRepository;
 import com.warehouse.wms.repository.SkuDimensionRepository;
 import com.warehouse.wms.repository.TrolleyRepository;
 import jakarta.persistence.EntityNotFoundException;
@@ -40,10 +41,10 @@ public class PickingService {
     private final MovementLogRepository movementLogRepository;
     private final BinRepository binRepository;
     private final SkuDimensionRepository skuDimensionRepository;
+    private final SalesOrderRepository salesOrderRepository;
 
     @Transactional
     public PickingSessionResponse startPicking(PickingStartRequest request) {
-        // Optionally associate trolley with compartment if both provided
         if (request.getTrolleyBarcode() != null && request.getRackCompartmentBarcode() != null) {
             Optional<Trolley> trolleyOpt = trolleyRepository.findByTrolleyIdentifier(request.getTrolleyBarcode());
             Optional<RackCompartment> compartmentOpt = rackCompartmentRepository
@@ -55,7 +56,6 @@ public class PickingService {
             }
         }
 
-        // Return pending pick tasks for this order
         List<PickTask> tasks = pickTaskRepository.findBySalesOrderLineSalesOrderId(request.getSalesOrderId())
                 .stream()
                 .filter(t -> "PENDING".equals(t.getStatus()))
@@ -84,7 +84,6 @@ public class PickingService {
         PickTask task = pickTaskRepository.findByInventoryIdAndStatus(inventory.getId(), "PENDING")
                 .orElseThrow(() -> new EntityNotFoundException("Pending pick task not found for item"));
 
-        // Only validate bin if both task and request have a bin barcode
         if (task.getBinBarcode() != null && request.getBinBarcode() != null
                 && !task.getBinBarcode().equals(request.getBinBarcode())) {
             throw new InventoryStateException("Scanned bin does not match expected pick bin");
@@ -95,10 +94,9 @@ public class PickingService {
         }
 
         if (inventory.getState() != Inventory.InventoryState.RESERVED) {
-            throw new InventoryStateException("Inventory must be in RESERVED state for picking");
+            throw new InventoryStateException("Inventory must be in RESERVED state for picking, current: " + inventory.getState());
         }
 
-        // Optionally associate trolley/compartment if provided
         Trolley trolley = null;
         RackCompartment compartment = null;
         if (request.getTrolleyBarcode() != null) {
@@ -113,22 +111,18 @@ public class PickingService {
         inventory.setState(Inventory.InventoryState.PICKED);
         inventoryRepository.save(inventory);
 
-        // Update bin occupancy if we have dimension info
+        // Free bin capacity
         if (inventory.getBin() != null) {
-            Optional<SkuDimension> dimOpt = skuDimensionRepository.findBySkuId(inventory.getSku().getId());
-            if (dimOpt.isPresent()) {
-                SkuDimension dimension = dimOpt.get();
-                BigDecimal itemVolume = dimension.getLengthCm().multiply(dimension.getWidthCm()).multiply(dimension.getHeightCm());
-                BigDecimal itemWeight = dimension.getWeightG();
-
-                BigDecimal currentVolume = inventory.getBin().getOccupiedVolumeCm3() == null ? BigDecimal.ZERO : inventory.getBin().getOccupiedVolumeCm3();
-                BigDecimal currentWeight = inventory.getBin().getOccupiedWeightG() == null ? BigDecimal.ZERO : inventory.getBin().getOccupiedWeightG();
-
-                inventory.getBin().setOccupiedVolumeCm3(currentVolume.subtract(itemVolume).max(BigDecimal.ZERO));
-                inventory.getBin().setOccupiedWeightG(currentWeight.subtract(itemWeight).max(BigDecimal.ZERO));
+            skuDimensionRepository.findBySkuId(inventory.getSku().getId()).ifPresent(dim -> {
+                BigDecimal vol = dim.getLengthCm().multiply(dim.getWidthCm()).multiply(dim.getHeightCm());
+                BigDecimal wt  = dim.getWeightG();
+                BigDecimal curVol = Optional.ofNullable(inventory.getBin().getOccupiedVolumeCm3()).orElse(BigDecimal.ZERO);
+                BigDecimal curWt  = Optional.ofNullable(inventory.getBin().getOccupiedWeightG()).orElse(BigDecimal.ZERO);
+                inventory.getBin().setOccupiedVolumeCm3(curVol.subtract(vol).max(BigDecimal.ZERO));
+                inventory.getBin().setOccupiedWeightG(curWt.subtract(wt).max(BigDecimal.ZERO));
                 inventory.getBin().setStatus(com.warehouse.wms.entity.Bin.BinStatus.AVAILABLE);
                 binRepository.save(inventory.getBin());
-            }
+            });
         }
 
         task.setStatus("COMPLETED");
@@ -143,6 +137,17 @@ public class PickingService {
         log.setBin(inventory.getBin());
         log.setAction("PICK_EXECUTED");
         movementLogRepository.save(log);
+
+        // Advance order to PICKED if all tasks for this order are now complete
+        Long orderId = task.getSalesOrderLine().getSalesOrder().getId();
+        List<PickTask> allOrderTasks = pickTaskRepository.findBySalesOrderLineSalesOrderId(orderId);
+        boolean allDone = allOrderTasks.stream().noneMatch(t -> "PENDING".equals(t.getStatus()));
+        if (allDone) {
+            salesOrderRepository.findById(orderId).ifPresent(order -> {
+                order.setStatus("PICKED");
+                salesOrderRepository.save(order);
+            });
+        }
 
         return ExecutionResult.builder()
                 .success(true)

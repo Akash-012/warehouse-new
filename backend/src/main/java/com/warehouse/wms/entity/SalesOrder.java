@@ -21,6 +21,19 @@ public class SalesOrder {
     private String soNumber;
 
     private String customerName;
+
+    @Column(name = "customer_phone")
+    private String customerPhone;
+
+    @Column(name = "customer_email")
+    private String customerEmail;
+
+    @Column(name = "customer_address")
+    private String customerAddress;
+
+    @Column(name = "gstin")
+    private String gstin;
+
     private LocalDate orderDate;
     private String status;
 

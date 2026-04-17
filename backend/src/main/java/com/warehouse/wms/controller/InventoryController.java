@@ -60,12 +60,54 @@ public class InventoryController {
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("content",       items);
+        result.put("number",         page);
         result.put("totalElements", total);
         result.put("totalPages",    size > 0 ? (int) Math.ceil((double) total / size) : 0);
         result.put("page",          page);
         result.put("size",          size);
         result.put("hasNext",       (page + 1) * size < total);
         return result;
+    }
+
+    @GetMapping("/stock-summary")
+    public List<Map<String, Object>> stockSummary() {
+        List<Object[]> rows = inventoryRepository.findStockSummaryByState();
+
+        // Aggregate per SKU: collect qty per state
+        Map<String, Map<String, Object>> bySkuCode = new java.util.LinkedHashMap<>();
+        for (Object[] row : rows) {
+            String skuCode = (String) row[0];
+            String skuName = (String) row[1];
+            String state   = row[2].toString();
+            long   qty     = ((Number) row[3]).longValue();
+
+            Map<String, Object> entry = bySkuCode.computeIfAbsent(skuCode, k -> {
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("skuCode",       skuCode);
+                m.put("skuName",       skuName);
+                m.put("availableQty",  0L);
+                m.put("unavailableQty", 0L);
+                m.put("totalQty",      0L);
+                return m;
+            });
+
+            long total = ((Number) entry.get("totalQty")).longValue() + qty;
+            entry.put("totalQty", total);
+
+            if ("AVAILABLE".equals(state)) {
+                entry.put("availableQty", ((Number) entry.get("availableQty")).longValue() + qty);
+            } else {
+                entry.put("unavailableQty", ((Number) entry.get("unavailableQty")).longValue() + qty);
+            }
+        }
+
+        // Add status field: AVAILABLE if availableQty > 0, else UNAVAILABLE
+        bySkuCode.values().forEach(e -> {
+            long avail = ((Number) e.get("availableQty")).longValue();
+            e.put("status", avail > 0 ? "AVAILABLE" : "UNAVAILABLE");
+        });
+
+        return new java.util.ArrayList<>(bySkuCode.values());
     }
 
     @PostMapping("/adjust")

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, Search, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, X, Sliders } from 'lucide-react';
+import { Download, Search, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, X, Sliders, BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
 import { format } from 'date-fns';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -57,6 +57,31 @@ function SortableHead({ field, label, sortField, sortDir, onSort }) {
   );
 }
 
+async function exportSummaryToExcel(summary) {
+  await exportWmsWorkbook({
+    fileName: `stock_summary_${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
+    sheetName: 'Available Stock',
+    title: 'WMS Stock Summary',
+    columns: [
+      { header: 'SKU Code',       key: 'skuCode',       width: 16 },
+      { header: 'Product Name',   key: 'skuName',       width: 32 },
+      { header: 'Available Qty',  key: 'availableQty',  width: 16, align: 'right' },
+      { header: 'Unavailable Qty',key: 'unavailableQty',width: 18, align: 'right' },
+      { header: 'Total Qty',      key: 'totalQty',      width: 14, align: 'right' },
+      { header: 'Status',         key: 'status',        width: 14, align: 'center' },
+    ],
+    rows: summary.map((s) => ({
+      skuCode:       s.skuCode ?? '',
+      skuName:       s.skuName ?? '',
+      availableQty:  Number(s.availableQty ?? 0),
+      unavailableQty:Number(s.unavailableQty ?? 0),
+      totalQty:      Number(s.totalQty ?? 0),
+      status:        s.status ?? '',
+    })),
+  });
+  toast.success('Stock summary exported to Excel');
+}
+
 async function exportToExcel(items) {
   await exportWmsWorkbook({
     fileName: `inventory_${format(new Date(), 'yyyy-MM-dd')}.xlsx`,
@@ -95,6 +120,31 @@ export default function InventoryPage() {
   const [adjustItem, setAdjustItem] = useState(null);
   const [adjustQty, setAdjustQty] = useState('');
   const [adjustReason, setAdjustReason] = useState('CYCLE_COUNT');
+  const [summaryOpen, setSummaryOpen] = useState(true);
+  const [summarySearch, setSummarySearch] = useState('');
+
+  const { data: stockSummary, isLoading: summaryLoading } = useQuery({
+    queryKey: ['stockSummary'],
+    queryFn: () => api.get('/inventory/stock-summary').then((r) => r.data ?? []),
+    staleTime: 15_000,
+    refetchInterval: 15_000,
+    retry: false,
+  });
+
+  const filteredSummary = useMemo(() => {
+    const list = stockSummary ?? [];
+    if (!summarySearch.trim()) return list;
+    const q = summarySearch.toLowerCase();
+    return list.filter((s) =>
+      String(s.skuCode ?? '').toLowerCase().includes(q) ||
+      String(s.skuName ?? '').toLowerCase().includes(q)
+    );
+  }, [stockSummary, summarySearch]);
+
+  const totalAvailable = useMemo(
+    () => (stockSummary ?? []).reduce((sum, s) => sum + Number(s.availableQty ?? 0), 0),
+    [stockSummary]
+  );
 
   const { data, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['inventory', { page, search, state, warehouse }],
@@ -167,6 +217,111 @@ export default function InventoryPage() {
         }
       />
 
+      {/* ── Product-wise Available Stock Summary ── */}
+      <Card className="glass-card rounded-[2rem] py-5">
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div
+              className="flex items-center gap-2 cursor-pointer select-none flex-1"
+              onClick={() => setSummaryOpen((v) => !v)}
+            >
+              <BarChart3 className="size-4 text-primary" />
+              <span className="font-semibold text-sm">Available Stock — Product Summary</span>
+              <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2 py-0.5">
+                {(stockSummary ?? []).length} SKUs
+              </span>
+              <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2 py-0.5">
+                {totalAvailable} available units
+              </span>
+              {summaryOpen
+                ? <ChevronUp className="size-4 text-muted-foreground" />
+                : <ChevronDown className="size-4 text-muted-foreground" />}
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-7 text-xs"
+              disabled={!(stockSummary ?? []).length}
+              onClick={(e) => { e.stopPropagation(); exportSummaryToExcel(stockSummary ?? []); }}
+            >
+              <Download className="size-3 mr-1" /> Export
+            </Button>
+          </div>
+
+          {summaryOpen && (
+            <>
+              <div className="relative w-full sm:max-w-xs">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  className="pl-8 h-8 text-sm"
+                  placeholder="Filter by SKU or name…"
+                  value={summarySearch}
+                  onChange={(e) => setSummarySearch(e.target.value)}
+                />
+              </div>
+              <div className="overflow-hidden rounded-2xl border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="hover:bg-transparent bg-muted/40">
+                      <TableHead className="w-32">SKU Code</TableHead>
+                      <TableHead>Product Name</TableHead>
+                      <TableHead className="text-right w-28">Available</TableHead>
+                      <TableHead className="text-right w-28">Unavailable</TableHead>
+                      <TableHead className="text-center w-32">Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {summaryLoading ? (
+                      [...Array(5)].map((_, i) => (
+                        <TableRow key={i}>
+                          {[...Array(5)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                        </TableRow>
+                      ))
+                    ) : filteredSummary.length ? (
+                      filteredSummary.map((s) => (
+                        <TableRow key={s.skuCode} className="table-row-hover">
+                          <TableCell className="font-mono font-semibold text-primary">{s.skuCode}</TableCell>
+                          <TableCell className="text-sm">{s.skuName || '—'}</TableCell>
+                          <TableCell className="text-right">
+                            <span className="inline-flex items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold text-sm px-3 py-0.5 min-w-[2.5rem]">
+                              {Number(s.availableQty ?? 0).toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="inline-flex items-center justify-center rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 font-bold text-sm px-3 py-0.5 min-w-[2.5rem]">
+                              {Number(s.unavailableQty ?? 0).toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {s.status === 'AVAILABLE' ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-0.5 ring-1 ring-inset ring-emerald-500/20">
+                                <span className="size-1.5 rounded-full bg-emerald-500" />
+                                Available
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 text-xs font-semibold px-2.5 py-0.5 ring-1 ring-inset ring-rose-500/20">
+                                <span className="size-1.5 rounded-full bg-rose-500" />
+                                Unavailable
+                              </span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    ) : (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-sm">
+                          {summarySearch ? 'No products match the filter.' : 'No available stock found.'}
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Adjust Stock Dialog */}
       <Dialog open={!!adjustItem} onOpenChange={(v) => !v && setAdjustItem(null)}>
         <DialogContent>
@@ -214,7 +369,7 @@ export default function InventoryPage() {
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 className="pl-9"
-                placeholder="Search SKU, barcode, batchÃ¢â‚¬Â¦"
+                placeholder="Search SKU, barcode, batch..."
                 value={search}
                 onChange={(e) => { setPage(0); setSearch(e.target.value); }}
               />
@@ -294,11 +449,11 @@ export default function InventoryPage() {
                     <TableRow key={item.id} className="table-row-hover">
                       <TableCell className="font-semibold">{item.skuCode ?? item.sku}</TableCell>
                       <TableCell className="font-mono text-xs">{item.barcode}</TableCell>
-                      <TableCell className="font-mono text-xs font-medium text-primary">{item.binBarcode ?? item.bin ?? 'Ã¢â‚¬â€'}</TableCell>
+                      <TableCell className="font-mono text-xs font-medium text-primary">{item.binBarcode ?? item.bin ?? '—'}</TableCell>
                       <TableCell><StatusBadge status={item.state} /></TableCell>
-                      <TableCell className="text-muted-foreground">{item.batchNo ?? item.batch ?? 'Ã¢â‚¬â€'}</TableCell>
+                      <TableCell className="text-muted-foreground">{item.batchNo ?? item.batch ?? '—'}</TableCell>
                       <TableCell className="font-semibold">{item.quantity}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM HH:mm') : 'Ã¢â‚¬â€'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM HH:mm') : '—'}</TableCell>
                       <TableCell className="text-right">
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => { setAdjustItem(item); setAdjustQty(String(item.quantity ?? '')); }}>
                           <Sliders className="size-3 mr-1" /> Adjust
@@ -324,8 +479,8 @@ export default function InventoryPage() {
               {totalItems > 0 && <span className="ml-2 text-xs">({totalItems} total records)</span>}
             </p>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" onClick={() => setPage((v) => Math.max(0, v - 1))} disabled={page === 0}>Ã¢â€ Â Previous</Button>
-              <Button variant="outline" size="sm" onClick={() => setPage((v) => v + 1)} disabled={!data?.hasNext && currentPage >= totalPages}>Next Ã¢â€ â€™</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((v) => Math.max(0, v - 1))} disabled={page === 0}>Previous</Button>
+              <Button variant="outline" size="sm" onClick={() => setPage((v) => v + 1)} disabled={!data?.hasNext && currentPage >= totalPages}>Next</Button>
             </div>
           </div>
         </CardContent>

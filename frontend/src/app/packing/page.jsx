@@ -1,11 +1,14 @@
-﻿'use client';
+'use client';
+export const dynamic = 'force-dynamic';
 
 import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { format } from 'date-fns';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScanInput } from '@/components/ui/ScanInput';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
@@ -16,48 +19,38 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
 import {
-  PackageCheck,
-  ArrowRight,
-  CheckCircle2,
-  Check,
-  Printer,
-  RotateCcw,
-  List,
+  PackageCheck, ArrowRight, CheckCircle2, Check, Printer, RotateCcw, List, Package,
 } from 'lucide-react';
-import { format } from 'date-fns';
 
 export default function PackingPage() {
-  const [trolleyBarcode, setTrolleyBarcode] = useState('');
-  const [compartmentBarcode, setCompartmentBarcode] = useState('');
+  const queryClient = useQueryClient();
+  const [orderId, setOrderId] = useState('');
   const [manifest, setManifest] = useState(null);
   const [scanProgress, setScanProgress] = useState({});
 
   const { data: packQueue, isLoading: queueLoading } = useQuery({
     queryKey: ['pack-queue'],
     queryFn: () => api.get('/orders').then((r) =>
-      (r.data ?? []).filter((o) => (o.status ?? o.state ?? '').toUpperCase() === 'PICKED')
+      (r.data ?? []).filter((o) => ['PICKED', 'PACKING'].includes((o.status ?? '').toUpperCase()))
     ),
     staleTime: 15_000,
     refetchInterval: 15_000,
     retry: false,
   });
 
-  const startMutation = useMutation({
-    mutationFn: ({ trolley, compartment }) =>
-      api.post(
-        `/packing/start?trolleyBarcode=${encodeURIComponent(trolley)}&compartmentBarcode=${encodeURIComponent(compartment)}`,
-      ).then((r) => r.data),
+  const loadManifestMutation = useMutation({
+    mutationFn: (id) => api.get(`/packing/manifest/${id}`).then((r) => r.data),
     onSuccess: (data) => {
       setManifest(data);
       setScanProgress({});
       toast.success(`Manifest loaded — Order #${data.orderId}`);
     },
-    onError: () => toast.error('Failed to load packing manifest'),
+    onError: (e) => toast.error(e.response?.data?.detail || 'Failed to load manifest'),
   });
 
   const scanMutation = useMutation({
     mutationFn: (itemBarcode) =>
-      api.post('/packing/scan', { itemBarcode, compartmentBarcode }).then((r) => r.data),
+      api.post('/packing/scan', { itemBarcode, orderId: manifest.orderId }).then((r) => r.data),
     onSuccess: (result, itemBarcode) => {
       const line = manifest?.lines.find((l) => l.itemBarcodes?.includes(itemBarcode));
       if (line) {
@@ -67,25 +60,23 @@ export default function PackingPage() {
         }));
       }
       if (result.complete) {
-        toast.success('Packing complete! All items packed.');
+        toast.success('Packing complete! Order ready to ship.');
+        queryClient.invalidateQueries({ queryKey: ['pack-queue'] });
       } else {
         toast.success(`Item packed — ${result.remaining} remaining`);
       }
     },
-    onError: () => toast.error('Scan failed — item not found in manifest'),
+    onError: (e) => toast.error(e.response?.data?.detail || 'Scan failed'),
   });
 
   const handleLoadManifest = (e) => {
     e.preventDefault();
-    if (trolleyBarcode && compartmentBarcode) {
-      startMutation.mutate({ trolley: trolleyBarcode, compartment: compartmentBarcode });
-    }
+    if (orderId) loadManifestMutation.mutate(orderId);
   };
 
   const handleReset = () => {
     setManifest(null);
-    setTrolleyBarcode('');
-    setCompartmentBarcode('');
+    setOrderId('');
     setScanProgress({});
   };
 
@@ -120,6 +111,7 @@ export default function PackingPage() {
     <div className="flex flex-col gap-6">
       <PageHeader title="Packing" description="Load manifests and verify items before dispatch." />
 
+      {/* Orders ready to pack */}
       <div className="glass-card rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
@@ -140,19 +132,30 @@ export default function PackingPage() {
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Order #</TableHead>
+                  <TableHead>SO Number</TableHead>
                   <TableHead>Customer</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {packQueue.map((order) => (
                   <TableRow key={order.id} className="table-row-hover">
                     <TableCell className="font-bold text-primary">#{order.id}</TableCell>
+                    <TableCell className="font-mono text-xs">{order.soNumber ?? '—'}</TableCell>
                     <TableCell className="font-medium">{order.customerName}</TableCell>
-                    <TableCell><StatusBadge status={order.status ?? order.state} /></TableCell>
+                    <TableCell><StatusBadge status={order.status} /></TableCell>
                     <TableCell className="text-xs text-muted-foreground">
                       {order.createdAt ? format(new Date(order.createdAt), 'dd MMM yyyy') : '—'}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => {
+                        setOrderId(String(order.id));
+                        loadManifestMutation.mutate(order.id);
+                      }}>
+                        <Package className="size-3 mr-1" /> Pack
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -163,6 +166,7 @@ export default function PackingPage() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[380px_1fr]">
+        {/* Load manifest panel */}
         <div className="glass-card rounded-2xl p-5 flex flex-col gap-5">
           <div className="flex items-center gap-2">
             <PackageCheck className="size-4 text-primary" />
@@ -170,26 +174,15 @@ export default function PackingPage() {
           </div>
 
           <form onSubmit={handleLoadManifest} className="flex flex-col gap-4">
-            <ScanInput
-              className="font-mono text-sm"
-              placeholder="Trolley barcode"
-              value={trolleyBarcode}
-              onChange={setTrolleyBarcode}
-              onScan={setTrolleyBarcode}
+            <Input
+              type="number"
+              placeholder="Order ID"
+              value={orderId}
+              onChange={(e) => setOrderId(e.target.value)}
               disabled={!!manifest}
-              clearAfterScan={false}
-            />
-            <ScanInput
-              className="font-mono text-sm"
-              placeholder="Compartment barcode"
-              value={compartmentBarcode}
-              onChange={setCompartmentBarcode}
-              onScan={setCompartmentBarcode}
-              disabled={!!manifest}
-              clearAfterScan={false}
             />
             {!manifest ? (
-              <Button type="submit" disabled={startMutation.isPending || !trolleyBarcode || !compartmentBarcode} className="w-full">
+              <Button type="submit" disabled={loadManifestMutation.isPending || !orderId} className="w-full">
                 <ArrowRight className="size-4 mr-2" /> Load Manifest
               </Button>
             ) : (
@@ -235,6 +228,7 @@ export default function PackingPage() {
           )}
         </div>
 
+        {/* Manifest display */}
         <div className="glass-card rounded-2xl p-5 flex flex-col gap-5">
           {!manifest ? (
             <div className="flex flex-col items-center justify-center gap-3 py-20 text-muted-foreground">

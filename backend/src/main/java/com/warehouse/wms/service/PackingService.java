@@ -4,99 +4,119 @@ import com.warehouse.wms.dto.PackScanResult;
 import com.warehouse.wms.dto.PackingManifest;
 import com.warehouse.wms.dto.PackingManifestLine;
 import com.warehouse.wms.entity.Inventory;
-import com.warehouse.wms.entity.RackCompartment;
+import com.warehouse.wms.entity.MovementLog;
+import com.warehouse.wms.entity.PickTask;
 import com.warehouse.wms.entity.SalesOrder;
 import com.warehouse.wms.exception.InventoryStateException;
 import com.warehouse.wms.repository.InventoryRepository;
-import com.warehouse.wms.repository.RackCompartmentRepository;
+import com.warehouse.wms.repository.MovementLogRepository;
+import com.warehouse.wms.repository.PickTaskRepository;
 import com.warehouse.wms.repository.SalesOrderRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class PackingService {
 
-    private final RackCompartmentRepository rackCompartmentRepository;
     private final SalesOrderRepository salesOrderRepository;
     private final InventoryRepository inventoryRepository;
+    private final PickTaskRepository pickTaskRepository;
+    private final MovementLogRepository movementLogRepository;
 
-    private final Map<Long, Set<String>> packedBarcodesByOrder = new ConcurrentHashMap<>();
+    /** Returns packing manifest for an order — all PICKED inventory items for this order. */
+    @Transactional
+    public PackingManifest getManifestByOrder(Long orderId) {
+        SalesOrder order = salesOrderRepository.findDetailedById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + orderId));
 
-    public PackingManifest startPacking(String trolleyBarcode, String compartmentBarcode) {
-        RackCompartment compartment = rackCompartmentRepository.findByCompartmentIdentifier(compartmentBarcode)
-                .orElseThrow(() -> new EntityNotFoundException("Compartment not found: " + compartmentBarcode));
-
-        if (compartment.getTrolley() == null || !compartment.getTrolley().getTrolleyIdentifier().equals(trolleyBarcode)) {
-            throw new InventoryStateException("Compartment is not assigned to the provided trolley");
+        if (!List.of("PICKED", "PACKING").contains(order.getStatus())) {
+            throw new InventoryStateException("Order must be in PICKED state to start packing, current: " + order.getStatus());
         }
 
-        SalesOrder order = Optional.ofNullable(compartment.getSalesOrder())
-                .orElseThrow(() -> new InventoryStateException("Compartment is not assigned to any order"));
+        // Advance to PACKING
+        if ("PICKED".equals(order.getStatus())) {
+            order.setStatus("PACKING");
+            salesOrderRepository.save(order);
+        }
 
-        List<Inventory> picked = inventoryRepository.findAllWithDetails().stream()
-                .filter(i -> i.getState() == Inventory.InventoryState.PICKED)
-                .filter(i -> order.getLines().stream().anyMatch(line -> line.getSku().getId().equals(i.getSku().getId())))
+        // Get inventory items that belong to this order via pick tasks
+        List<Inventory> pickedItems = getOrderPickedInventory(orderId);
+
+        Map<String, List<Inventory>> grouped = pickedItems.stream()
+                .collect(Collectors.groupingBy(i -> i.getSku().getSkuCode()));
+
+        List<PackingManifestLine> lines = grouped.entrySet().stream()
+                .map(e -> PackingManifestLine.builder()
+                        .skuCode(e.getKey())
+                        .expectedQty(e.getValue().size())
+                        .itemBarcodes(e.getValue().stream().map(Inventory::getSerialNo).toList())
+                        .build())
                 .toList();
 
-        Map<String, List<Inventory>> grouped = picked.stream().collect(Collectors.groupingBy(i -> i.getSku().getSkuCode()));
-        List<PackingManifestLine> lines = grouped.entrySet().stream().map(entry -> PackingManifestLine.builder()
-                .skuCode(entry.getKey())
-                .expectedQty(entry.getValue().size())
-                .itemBarcodes(entry.getValue().stream().map(Inventory::getSerialNo).toList())
-                .build()).toList();
-
-        packedBarcodesByOrder.putIfAbsent(order.getId(), ConcurrentHashMap.newKeySet());
-
         return PackingManifest.builder()
-                .orderId(order.getId())
+                .orderId(orderId)
+                .customerName(order.getCustomerName())
                 .lines(lines)
                 .build();
     }
 
     @Transactional
-    public PackScanResult scanItem(String itemBarcode, String compartmentBarcode) {
-        RackCompartment compartment = rackCompartmentRepository.findByCompartmentIdentifier(compartmentBarcode)
-                .orElseThrow(() -> new EntityNotFoundException("Compartment not found: " + compartmentBarcode));
-        SalesOrder order = Optional.ofNullable(compartment.getSalesOrder())
-                .orElseThrow(() -> new InventoryStateException("Compartment is not assigned to any order"));
+    public PackScanResult scanItem(String itemBarcode, Long orderId) {
+        SalesOrder order = salesOrderRepository.findDetailedById(orderId)
+                .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + orderId));
 
         Inventory inventory = inventoryRepository.findBySerialNo(itemBarcode)
-                .orElseThrow(() -> new EntityNotFoundException("Inventory not found for item barcode: " + itemBarcode));
+                .orElseThrow(() -> new EntityNotFoundException("Inventory not found for barcode: " + itemBarcode));
 
-        boolean belongsToOrder = order.getLines().stream().anyMatch(line -> line.getSku().getId().equals(inventory.getSku().getId()));
+        // Verify item belongs to this order via pick tasks
+        boolean belongsToOrder = pickTaskRepository.findBySalesOrderLineSalesOrderId(orderId)
+                .stream().anyMatch(t -> t.getInventory().getId().equals(inventory.getId()));
         if (!belongsToOrder) {
-            throw new InventoryStateException("Scanned item does not belong to this order");
+            throw new InventoryStateException("Scanned item does not belong to order #" + orderId);
         }
 
-        Set<String> scanned = packedBarcodesByOrder.computeIfAbsent(order.getId(), id -> ConcurrentHashMap.newKeySet());
-        scanned.add(itemBarcode);
+        if (inventory.getState() != Inventory.InventoryState.PICKED) {
+            throw new InventoryStateException("Item must be in PICKED state to pack, current: " + inventory.getState());
+        }
 
-        List<Inventory> orderPickedItems = inventoryRepository.findAllWithDetails().stream()
-                .filter(i -> i.getState() == Inventory.InventoryState.PICKED)
-                .filter(i -> order.getLines().stream().anyMatch(line -> line.getSku().getId().equals(i.getSku().getId())))
-                .toList();
+        Inventory.InventoryState fromState = inventory.getState();
+        inventory.setState(Inventory.InventoryState.PACKED);
+        inventoryRepository.save(inventory);
 
-        int remaining = Math.max(orderPickedItems.size() - scanned.size(), 0);
-        boolean complete = remaining == 0;
+        MovementLog log = new MovementLog();
+        log.setInventory(inventory);
+        log.setFromState(fromState);
+        log.setToState(Inventory.InventoryState.PACKED);
+        log.setAction("PACK_EXECUTED");
+        movementLogRepository.save(log);
+
+        // Check if all items for this order are now packed
+        List<Inventory> orderItems = getOrderPickedInventory(orderId);
+        long stillPicked = orderItems.stream().filter(i -> i.getState() == Inventory.InventoryState.PICKED).count();
+        long packed      = orderItems.stream().filter(i -> i.getState() == Inventory.InventoryState.PACKED).count()
+                         + (inventory.getState() == Inventory.InventoryState.PACKED ? 0 : 1); // already counted above
+
+        // Re-query to get accurate counts after save
+        List<Inventory> refreshed = getOrderInventoryByState(orderId, Inventory.InventoryState.PICKED);
+        boolean complete = refreshed.isEmpty();
 
         if (complete) {
-            for (Inventory item : orderPickedItems) {
-                item.setState(Inventory.InventoryState.PACKED);
-                inventoryRepository.save(item);
-            }
             order.setStatus("PACKED");
             salesOrderRepository.save(order);
         }
 
+        int totalItems = getOrderPickedAndPackedCount(orderId);
+        int remaining  = (int) refreshed.size();
+
         return PackScanResult.builder()
-                .scanned(scanned.size())
+                .scanned(totalItems - remaining)
                 .remaining(remaining)
                 .complete(complete)
                 .build();
@@ -106,17 +126,42 @@ public class PackingService {
         SalesOrder order = salesOrderRepository.findById(orderId)
                 .orElseThrow(() -> new EntityNotFoundException("Sales order not found: " + orderId));
 
-        Set<String> scanned = packedBarcodesByOrder.getOrDefault(orderId, Set.of());
-        int expected = inventoryRepository.findAllWithDetails().stream()
-                .filter(i -> order.getLines().stream().anyMatch(line -> line.getSku().getId().equals(i.getSku().getId())))
-                .filter(i -> i.getState() == Inventory.InventoryState.PICKED || i.getState() == Inventory.InventoryState.PACKED)
-                .toList().size();
+        int picked = getOrderInventoryByState(orderId, Inventory.InventoryState.PICKED).size();
+        int packed  = getOrderInventoryByState(orderId, Inventory.InventoryState.PACKED).size();
+        int total   = picked + packed;
 
-        int remaining = Math.max(expected - scanned.size(), 0);
         return PackScanResult.builder()
-                .scanned(scanned.size())
-                .remaining(remaining)
-                .complete(remaining == 0 && expected > 0)
+                .scanned(packed)
+                .remaining(picked)
+                .complete(picked == 0 && packed > 0)
                 .build();
+    }
+
+    // ── helpers ──────────────────────────────────────────────────────────────
+
+    private List<Inventory> getOrderPickedInventory(Long orderId) {
+        return pickTaskRepository.findBySalesOrderLineSalesOrderId(orderId).stream()
+                .map(PickTask::getInventory)
+                .filter(i -> i.getState() == Inventory.InventoryState.PICKED
+                          || i.getState() == Inventory.InventoryState.PACKED)
+                .toList();
+    }
+
+    private List<Inventory> getOrderInventoryByState(Long orderId, Inventory.InventoryState state) {
+        return pickTaskRepository.findBySalesOrderLineSalesOrderId(orderId).stream()
+                .map(PickTask::getInventory)
+                // Re-fetch to get latest state
+                .map(i -> inventoryRepository.findById(i.getId()).orElse(i))
+                .filter(i -> i.getState() == state)
+                .toList();
+    }
+
+    private int getOrderPickedAndPackedCount(Long orderId) {
+        return (int) pickTaskRepository.findBySalesOrderLineSalesOrderId(orderId).stream()
+                .map(PickTask::getInventory)
+                .map(i -> inventoryRepository.findById(i.getId()).orElse(i))
+                .filter(i -> i.getState() == Inventory.InventoryState.PICKED
+                          || i.getState() == Inventory.InventoryState.PACKED)
+                .count();
     }
 }

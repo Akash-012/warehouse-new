@@ -14,6 +14,6 @@ public class ReceivePOLineRequest {
     @Min(value = 1, message = "quantity must be at least 1")
     private Integer quantity;
 
-    @NotBlank(message = "batchNo is required")
+    // Optional — auto-generated as BATCH-{YYYYMM}-{skuCode} if blank
     private String batchNo;
 }

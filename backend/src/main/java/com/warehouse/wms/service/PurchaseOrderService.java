@@ -13,12 +13,14 @@ import com.warehouse.wms.repository.PurchaseOrderRepository;
 import com.warehouse.wms.repository.SkuRepository;
 import com.warehouse.wms.repository.WarehouseRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -109,10 +111,49 @@ public class PurchaseOrderService {
     }
 
     public List<POResponse> listAll() {
-        // Use summary query to avoid N+1; lines are not included in list view
-        return purchaseOrderRepository.findAllWithLines().stream()
-                .map(this::toResponse)
-                .toList();
+        List<PurchaseOrder> pos = purchaseOrderRepository.findAllWithLines();
+        if (pos.isEmpty()) return List.of();
+
+        // Batch-load received counts to avoid N+1
+        List<Long> poIds = pos.stream().map(PurchaseOrder::getId).toList();
+        List<Object[]> counts = purchaseOrderRepository.countReceivedByPoIds(poIds);
+        // Build map: poId -> skuId -> receivedCount
+        Map<Long, Map<Long, Long>> receivedMap = new HashMap<>();
+        for (Object[] row : counts) {
+            Long poId  = ((Number) row[0]).longValue();
+            Long skuId = ((Number) row[1]).longValue();
+            Long cnt   = ((Number) row[2]).longValue();
+            receivedMap.computeIfAbsent(poId, k -> new HashMap<>()).put(skuId, cnt);
+        }
+
+        return pos.stream().map(po -> toResponseWithCounts(po, receivedMap.getOrDefault(po.getId(), Map.of()))).toList();
+    }
+
+    private POResponse toResponseWithCounts(PurchaseOrder po, Map<Long, Long> receivedCounts) {
+        List<POResponse.LineItem> lines = po.getLines() == null ? List.of() :
+                po.getLines().stream().map(l -> POResponse.LineItem.builder()
+                        .id(l.getId())
+                        .skuId(l.getSku().getId())
+                        .skuCode(l.getSku().getSkuCode())
+                        .skuDescription(l.getSku().getDescription())
+                        .quantity(l.getQuantity())
+                        .receivedQty(receivedCounts.getOrDefault(l.getSku().getId(), 0L).intValue())
+                        .unitPrice(l.getUnitPrice())
+                        .sgstRate(l.getSgstRate())
+                        .cgstRate(l.getCgstRate())
+                        .build()).toList();
+
+        return POResponse.builder()
+                .id(po.getId())
+                .poNumber(po.getPoNumber())
+                .supplier(po.getSupplier())
+                .status(po.getStatus())
+                .priority(po.getPriority())
+                .expectedArrivalDate(po.getExpectedArrivalDate())
+                .createdAt(po.getCreatedAt())
+                .updatedAt(po.getUpdatedAt())
+                .lines(lines)
+                .build();
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────

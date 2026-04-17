@@ -9,7 +9,10 @@ import java.util.Optional;
 
 public interface SalesOrderRepository extends JpaRepository<SalesOrder, Long> {
 
-    @Query("SELECT s.id, s.customerName, s.status, s.createdAt, s.soNumber FROM SalesOrder s ORDER BY s.id DESC")
+    @Query("SELECT s.id, s.customerName, s.status, s.createdAt, s.soNumber, " +
+           "s.customerPhone, s.customerEmail, s.customerAddress, s.gstin, COUNT(l) " +
+           "FROM SalesOrder s LEFT JOIN s.lines l GROUP BY s.id, s.customerName, s.status, s.createdAt, s.soNumber, " +
+           "s.customerPhone, s.customerEmail, s.customerAddress, s.gstin ORDER BY s.id DESC")
     List<Object[]> findAllSummary();
 
     @Query("SELECT DISTINCT s FROM SalesOrder s LEFT JOIN FETCH s.lines l LEFT JOIN FETCH l.sku WHERE s.id = :id")

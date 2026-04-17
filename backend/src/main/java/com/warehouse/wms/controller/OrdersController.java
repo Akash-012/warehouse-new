@@ -28,11 +28,16 @@ public class OrdersController {
     public List<Map<String, Object>> list() {
         return salesOrderRepository.findAllSummary().stream().map(row -> {
             Map<String, Object> m = new LinkedHashMap<>();
-            m.put("id", row[0]);
-            m.put("customerName", row[1]);
-            m.put("status", row[2]);
-            m.put("createdAt", row[3]);
-            m.put("soNumber", row[4]);
+            m.put("id",              row[0]);
+            m.put("customerName",    row[1]);
+            m.put("status",          row[2]);
+            m.put("createdAt",       row[3]);
+            m.put("soNumber",        row[4]);
+            m.put("customerPhone",   row[5]);
+            m.put("customerEmail",   row[6]);
+            m.put("customerAddress", row[7]);
+            m.put("gstin",           row[8]);
+            m.put("lineCount",       row[9]);
             return m;
         }).toList();
     }

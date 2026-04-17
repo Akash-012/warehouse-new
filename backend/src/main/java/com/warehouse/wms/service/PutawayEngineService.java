@@ -9,8 +9,7 @@ import com.warehouse.wms.repository.BinRepository;
 import com.warehouse.wms.repository.InventoryRepository;
 import com.warehouse.wms.repository.PutawayTaskRepository;
 import com.warehouse.wms.repository.SkuDimensionRepository;
-import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -38,20 +37,23 @@ public class PutawayEngineService {
         Bin overflow = ensureOverflowBin();
 
         for (Inventory inventory : receivedItems) {
-            // Skip if a task already exists for this inventory item
-            if (putawayTaskRepository.existsByInventoryId(inventory.getId())) {
+            // Skip if a PENDING task already exists for this inventory item
+            if (putawayTaskRepository.existsByInventoryIdAndStatus(inventory.getId(), PutawayTask.PutawayTaskStatus.PENDING)) {
                 continue;
             }
 
-            SkuDimension dimension = skuDimensionRepository.findBySkuId(inventory.getSku().getId())
-                    .orElseThrow(() -> new EntityNotFoundException("SKU dimension not found for skuId=" + inventory.getSku().getId()));
+            SkuDimension dimension = skuDimensionRepository.findBySkuId(inventory.getSku().getId()).orElse(null);
 
-            BigDecimal itemVolume = dimension.getLengthCm().multiply(dimension.getWidthCm()).multiply(dimension.getHeightCm());
-            BigDecimal itemWeight = dimension.getWeightG();
-
-            Bin suggested = binRepository.findBinsWithCapacity(itemVolume, itemWeight).stream()
-                    .findFirst()
-                    .orElse(overflow);
+            Bin suggested;
+            if (dimension == null) {
+                suggested = overflow;
+            } else {
+                BigDecimal itemVolume = dimension.getLengthCm().multiply(dimension.getWidthCm()).multiply(dimension.getHeightCm());
+                BigDecimal itemWeight = dimension.getWeightG();
+                suggested = binRepository.findBinsWithCapacity(itemVolume, itemWeight).stream()
+                        .findFirst()
+                        .orElse(overflow);
+            }
 
             PutawayTask task = new PutawayTask();
             task.setInventory(inventory);

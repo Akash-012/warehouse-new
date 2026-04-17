@@ -4,6 +4,7 @@ import com.warehouse.wms.dto.*;
 import com.warehouse.wms.entity.*;
 import com.warehouse.wms.mapper.BinMapper;
 import com.warehouse.wms.repository.*;
+import com.warehouse.wms.repository.SkuRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.validation.Valid;
@@ -31,6 +32,7 @@ public class MasterDataController {
     private final RackRepository rackRepository;
     private final BinRepository binRepository;
     private final BinMapper binMapper;
+    private final SkuRepository skuRepository;
 
     @Operation(summary = "Create warehouse")
     @PostMapping("/warehouses")
@@ -106,6 +108,7 @@ public class MasterDataController {
 
     @Operation(summary = "Update zone")
     @PutMapping("/zones/{id}")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Map<String, Object>> updateZone(@PathVariable Long id, @Valid @RequestBody ZoneRequest request) {
         Zone zone = zoneRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Zone not found: " + id));
@@ -118,6 +121,7 @@ public class MasterDataController {
 
     @Operation(summary = "Delete zone")
     @DeleteMapping("/zones/{id}")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Void> deleteZone(@PathVariable Long id) {
         if (!zoneRepository.existsById(id)) {
             throw new EntityNotFoundException("Zone not found: " + id);
@@ -128,6 +132,7 @@ public class MasterDataController {
 
     @Operation(summary = "Create aisle")
     @PostMapping("/aisles")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Map<String, Object>> createAisle(@Valid @RequestBody AisleRequest request) {
         Zone zone = zoneRepository.findById(request.getZoneId())
                 .orElseThrow(() -> new EntityNotFoundException("Zone not found: " + request.getZoneId()));
@@ -153,6 +158,7 @@ public class MasterDataController {
 
     @Operation(summary = "Update aisle")
     @PutMapping("/aisles/{id}")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Map<String, Object>> updateAisle(@PathVariable Long id, @Valid @RequestBody AisleRequest request) {
         Aisle aisle = aisleRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Aisle not found: " + id));
@@ -165,6 +171,7 @@ public class MasterDataController {
 
     @Operation(summary = "Delete aisle")
     @DeleteMapping("/aisles/{id}")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Void> deleteAisle(@PathVariable Long id) {
         if (!aisleRepository.existsById(id)) {
             throw new EntityNotFoundException("Aisle not found: " + id);
@@ -175,6 +182,7 @@ public class MasterDataController {
 
     @Operation(summary = "Create rack")
     @PostMapping("/racks")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Map<String, Object>> createRack(@Valid @RequestBody RackRequest request) {
         Aisle aisle = aisleRepository.findById(request.getAisleId())
                 .orElseThrow(() -> new EntityNotFoundException("Aisle not found: " + request.getAisleId()));
@@ -200,6 +208,7 @@ public class MasterDataController {
 
     @Operation(summary = "Update rack")
     @PutMapping("/racks/{id}")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Map<String, Object>> updateRack(@PathVariable Long id, @Valid @RequestBody RackRequest request) {
         Rack rack = rackRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Rack not found: " + id));
@@ -245,6 +254,7 @@ public class MasterDataController {
 
     @Operation(summary = "Delete rack")
     @DeleteMapping("/racks/{id}")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
     public ResponseEntity<Void> deleteRack(@PathVariable Long id) {
         if (!rackRepository.existsById(id)) {
             throw new EntityNotFoundException("Rack not found: " + id);
@@ -278,6 +288,18 @@ public class MasterDataController {
     @GetMapping("/bins")
     public ResponseEntity<List<BinResponse>> listBins() {
         return ResponseEntity.ok(binRepository.findAll().stream().map(binMapper::toResponse).toList());
+    }
+
+    @Operation(summary = "List all SKUs")
+    @GetMapping("/skus")
+    public ResponseEntity<List<Map<String, Object>>> listSkus() {
+        return ResponseEntity.ok(skuRepository.findAll().stream().map(s -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("id",          s.getId());
+            m.put("skuCode",     s.getSkuCode());
+            m.put("description", s.getDescription());
+            return m;
+        }).toList());
     }
 
     @Operation(summary = "Update bin")

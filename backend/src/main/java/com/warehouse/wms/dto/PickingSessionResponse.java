@@ -5,8 +5,11 @@ import lombok.Value;
 
 import java.util.List;
 
+import lombok.Data;
+
 @Value
 @Builder
+
 public class PickingSessionResponse {
     Long orderId;
     List<PickingSessionItem> items;

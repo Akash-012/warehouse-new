@@ -31,6 +31,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, ex.getMessage());
         problemDetail.setTitle("Entity Not Found");
         problemDetail.setType(URI.create("https://api.warehouse.com/errors/entity-not-found"));
+        problemDetail.setProperty("detail", ex.getMessage());
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
@@ -40,6 +41,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Inventory State Error");
         problemDetail.setType(URI.create("https://api.warehouse.com/errors/inventory-state-error"));
+        problemDetail.setProperty("detail", ex.getMessage());
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
@@ -49,6 +51,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
         problemDetail.setTitle("Insufficient Stock");
         problemDetail.setType(URI.create("https://api.warehouse.com/errors/insufficient-stock"));
+        problemDetail.setProperty("detail", ex.getMessage());
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
@@ -58,6 +61,7 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
         problemDetail.setTitle("Invalid Request");
         problemDetail.setType(URI.create("https://api.warehouse.com/errors/invalid-request"));
+        problemDetail.setProperty("detail", ex.getMessage());
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }
@@ -67,6 +71,16 @@ public class GlobalExceptionHandler extends ResponseEntityExceptionHandler {
         ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.UNPROCESSABLE_ENTITY, ex.getMessage());
         problemDetail.setTitle("PO Not Editable");
         problemDetail.setType(URI.create("https://api.warehouse.com/errors/po-not-editable"));
+        problemDetail.setProperty("timestamp", Instant.now());
+        return problemDetail;
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ProblemDetail handleIllegalState(IllegalStateException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, ex.getMessage());
+        problemDetail.setTitle("Invalid State Transition");
+        problemDetail.setType(URI.create("https://api.warehouse.com/errors/invalid-state"));
+        problemDetail.setProperty("detail", ex.getMessage());
         problemDetail.setProperty("timestamp", Instant.now());
         return problemDetail;
     }

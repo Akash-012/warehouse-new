@@ -50,7 +50,7 @@ export default function ReportsPage() {
   const [toDate, setToDate] = useState(TODAY);
 
   const { data: kpis } = useQuery({
-    queryKey: ["dashboard-kpis"],
+    queryKey: ["reports-kpis"],
     queryFn: () => api.get("/reports/kpis").then((r) => r.data),
     staleTime: 60_000,
   });
@@ -299,7 +299,7 @@ export default function ReportsPage() {
             Shipments Trend
           </h2>
           <span className="ml-auto text-xs text-muted-foreground">
-            {fromDate} â€” {toDate}
+            {fromDate} &ndash; {toDate}
           </span>
         </div>
         {shipmentsTrend?.length ? (
@@ -353,7 +353,7 @@ export default function ReportsPage() {
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
             <TrendingUp className="size-10 opacity-30" />
             <p className="text-sm">
-              No shipment trend data â€” adjust the date range above
+              No shipment trend data &mdash; adjust the date range above
             </p>
           </div>
         )}

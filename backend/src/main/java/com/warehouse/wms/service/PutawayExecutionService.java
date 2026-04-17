@@ -16,7 +16,7 @@ import com.warehouse.wms.repository.PutawayTaskRepository;
 import com.warehouse.wms.repository.SkuDimensionRepository;
 import com.warehouse.wms.repository.UserRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -38,8 +38,9 @@ public class PutawayExecutionService {
         Inventory inventory = inventoryRepository.findBySerialNo(itemBarcode)
                 .orElseThrow(() -> new EntityNotFoundException("Inventory not found for barcode: " + itemBarcode));
 
-        if (inventory.getState() != Inventory.InventoryState.IN_PUTAWAY) {
-            throw new InventoryStateException("Inventory state must be IN_PUTAWAY for putaway execution");
+        if (inventory.getState() != Inventory.InventoryState.IN_PUTAWAY
+                && inventory.getState() != Inventory.InventoryState.RECEIVED) {
+            throw new InventoryStateException("Inventory must be in RECEIVED or IN_PUTAWAY state for putaway execution, current state: " + inventory.getState());
         }
 
         PutawayTask task = putawayTaskRepository
@@ -58,27 +59,38 @@ public class PutawayExecutionService {
             throw new InventoryStateException("Scanned bin differs from suggested bin; manager override required");
         }
 
-        SkuDimension dimension = skuDimensionRepository.findBySkuId(inventory.getSku().getId())
-                .orElseThrow(() -> new EntityNotFoundException("SKU dimension not found for skuId=" + inventory.getSku().getId()));
+        SkuDimension dimension = skuDimensionRepository.findBySkuId(inventory.getSku().getId()).orElse(null);
 
-        BigDecimal itemVolume = dimension.getLengthCm().multiply(dimension.getWidthCm()).multiply(dimension.getHeightCm());
-        BigDecimal itemWeight = dimension.getWeightG();
+        BigDecimal itemVolume;
+        BigDecimal itemWeight;
+        if (dimension != null) {
+            itemVolume = dimension.getLengthCm().multiply(dimension.getWidthCm()).multiply(dimension.getHeightCm());
+            itemWeight = dimension.getWeightG();
 
-        BigDecimal currentOccVol    = scannedBin.getOccupiedVolumeCm3() != null ? scannedBin.getOccupiedVolumeCm3() : BigDecimal.ZERO;
-        BigDecimal currentOccWeight  = scannedBin.getOccupiedWeightG()   != null ? scannedBin.getOccupiedWeightG()   : BigDecimal.ZERO;
-        BigDecimal binVolume         = scannedBin.getVolumeCm3()         != null ? scannedBin.getVolumeCm3()         : BigDecimal.valueOf(Long.MAX_VALUE);
-        BigDecimal binMaxWeight      = scannedBin.getMaxWeightG()        != null ? scannedBin.getMaxWeightG()        : BigDecimal.valueOf(Long.MAX_VALUE);
+            BigDecimal currentOccVol    = scannedBin.getOccupiedVolumeCm3() != null ? scannedBin.getOccupiedVolumeCm3() : BigDecimal.ZERO;
+            BigDecimal currentOccWeight = scannedBin.getOccupiedWeightG()   != null ? scannedBin.getOccupiedWeightG()   : BigDecimal.ZERO;
+            BigDecimal binVolume        = scannedBin.getVolumeCm3()         != null ? scannedBin.getVolumeCm3()         : BigDecimal.valueOf(Long.MAX_VALUE);
+            BigDecimal binMaxWeight     = scannedBin.getMaxWeightG()        != null ? scannedBin.getMaxWeightG()        : BigDecimal.valueOf(Long.MAX_VALUE);
 
-        BigDecimal freeVolume  = binVolume.subtract(currentOccVol);
-        BigDecimal freeWeight  = binMaxWeight.subtract(currentOccWeight);
-        if (freeVolume.compareTo(itemVolume) < 0 || freeWeight.compareTo(itemWeight) < 0) {
-            throw new InventoryStateException("Scanned bin does not have enough remaining capacity");
+            BigDecimal freeVolume  = binVolume.subtract(currentOccVol);
+            BigDecimal freeWeight  = binMaxWeight.subtract(currentOccWeight);
+            if (freeVolume.compareTo(itemVolume) < 0 || freeWeight.compareTo(itemWeight) < 0) {
+                throw new InventoryStateException("Scanned bin does not have enough remaining capacity");
+            }
+        } else {
+            // No dimension data — skip capacity check, use zero for occupancy update
+            itemVolume = BigDecimal.ZERO;
+            itemWeight = BigDecimal.ZERO;
         }
 
         Inventory.InventoryState fromState = inventory.getState();
         inventory.setBin(scannedBin);
         inventory.setState(Inventory.InventoryState.AVAILABLE);
         inventoryRepository.save(inventory);
+
+        BigDecimal currentOccVol    = scannedBin.getOccupiedVolumeCm3() != null ? scannedBin.getOccupiedVolumeCm3() : BigDecimal.ZERO;
+        BigDecimal currentOccWeight = scannedBin.getOccupiedWeightG()   != null ? scannedBin.getOccupiedWeightG()   : BigDecimal.ZERO;
+        BigDecimal binVolume        = scannedBin.getVolumeCm3()         != null ? scannedBin.getVolumeCm3()         : BigDecimal.valueOf(Long.MAX_VALUE);
 
         scannedBin.setOccupiedVolumeCm3(currentOccVol.add(itemVolume));
         scannedBin.setOccupiedWeightG(currentOccWeight.add(itemWeight));

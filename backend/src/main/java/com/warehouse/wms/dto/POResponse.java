@@ -22,6 +22,10 @@ public class POResponse {
     private LocalDateTime updatedAt;
     private List<LineItem> lines;
 
+    public Integer getLineCount() {
+        return lines != null ? lines.size() : 0;
+    }
+
     @Data
     @Builder
     public static class LineItem {

@@ -193,7 +193,7 @@ export default function PutawayPage() {
               <div className="relative flex-1 min-w-48">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
                 <Input
-                  placeholder="Search barcode or SKUÃ¢â‚¬Â¦"
+                  placeholder="Search barcode or SKU..."
                   className="pl-8 h-8 text-sm"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}

@@ -32,6 +32,14 @@ public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     int bulkUpdateState(@Param("ids") List<Long> ids,
             @Param("toState") Inventory.InventoryState toState);
 
+    /** Product-wise stock summary by state: returns [skuCode, description, state, totalQty] */
+    @Query("SELECT i.sku.skuCode, i.sku.description, i.state, SUM(i.quantity) " +
+           "FROM Inventory i " +
+           "WHERE i.state <> com.warehouse.wms.entity.Inventory.InventoryState.SHIPPED " +
+           "GROUP BY i.sku.id, i.sku.skuCode, i.sku.description, i.state " +
+           "ORDER BY i.sku.skuCode ASC")
+    List<Object[]> findStockSummaryByState();
+
     /** Count items already received for a PO+SKU combination (excludes SHIPPED to allow re-receiving). */
     @Query("SELECT COUNT(i) FROM Inventory i " +
            "WHERE i.goodsReceiptLine.goodsReceipt.purchaseOrder.id = :poId " +

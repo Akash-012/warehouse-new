@@ -41,6 +41,10 @@ public class SalesOrderService {
         SalesOrder order = new SalesOrder();
         order.setSoNumber("SO-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss")));
         order.setCustomerName(request.getCustomerName());
+        order.setCustomerPhone(request.getCustomerPhone());
+        order.setCustomerEmail(request.getCustomerEmail());
+        order.setCustomerAddress(request.getCustomerAddress());
+        order.setGstin(request.getGstin());
         order.setOrderDate(LocalDate.now());
         order.setStatus("CREATED");
 

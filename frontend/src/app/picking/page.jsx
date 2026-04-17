@@ -1,8 +1,9 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'next/navigation';
 import { usePickingSession } from '@/lib/hooks/usePickingSession';
 import PageHeader from '@/components/PageHeader';
 import StatCard from '@/components/StatCard';
@@ -34,6 +35,7 @@ import {
   ListChecks,
   Download,
   Search,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -44,25 +46,32 @@ async function exportPicksExcel(tasks) {
     sheetName: 'Pick Tasks',
     title: 'WMS Picking Queue Export',
     columns: [
-      { header: 'SKU', key: 'skuCode', width: 18 },
-      { header: 'Bin', key: 'binBarcode', width: 16 },
-      { header: 'Qty Required', key: 'requiredQty', width: 14, align: 'right' },
-      { header: 'Status', key: 'status', width: 14, align: 'center' },
+      { header: 'Order ID',  key: 'orderId',    width: 12, align: 'right' },
+      { header: 'SO Number', key: 'soNumber',   width: 18 },
+      { header: 'SKU',       key: 'skuCode',    width: 18 },
+      { header: 'Bin',       key: 'binBarcode', width: 16 },
+      { header: 'Qty',       key: 'quantity',   width: 10, align: 'right' },
+      { header: 'Status',    key: 'status',     width: 14, align: 'center' },
     ],
     rows: tasks.map((t) => ({
-      skuCode: t.skuCode ?? t.sku ?? '',
+      orderId:    t.orderId ?? '',
+      soNumber:   t.soNumber ?? '',
+      skuCode:    t.skuCode ?? t.sku ?? '',
       binBarcode: t.binBarcode ?? t.bin ?? '',
-      requiredQty: t.requiredQty ?? t.quantity ?? 1,
-      status: t.status ?? 'PENDING',
+      quantity:   t.quantity ?? 1,
+      status:     t.status ?? 'PENDING',
     })),
   });
   toast.success('Pick tasks exported to Excel');
 }
 
 export default function PickingPage() {
+  const searchParams = useSearchParams();
+  const urlOrderId = searchParams.get('orderId');
+
   const [trolley, setTrolley] = useState('');
   const [rack, setRack] = useState('');
-  const [orderId, setOrderId] = useState('');
+  const [orderId, setOrderId] = useState(urlOrderId || '');
   const [search, setSearch] = useState('');
 
   const { startSession, scanItem, resetSession, expectedItems, scannedItems, isLoading } =
@@ -86,12 +95,14 @@ export default function PickingPage() {
     return (pendingTasks ?? []).filter(
       (t) =>
         (t.skuCode ?? t.sku ?? '').toLowerCase().includes(q) ||
-        (t.binBarcode ?? t.bin ?? '').toLowerCase().includes(q),
+        (t.binBarcode ?? t.bin ?? '').toLowerCase().includes(q) ||
+        (t.soNumber ?? '').toLowerCase().includes(q) ||
+        String(t.orderId ?? '').includes(q),
     );
   }, [pendingTasks, search]);
 
   const queueTotal = useMemo(
-    () => (pendingTasks ?? []).reduce((s, t) => s + (t.requiredQty ?? t.quantity ?? 1), 0),
+    () => (pendingTasks ?? []).reduce((s, t) => s + (t.quantity ?? 1), 0),
     [pendingTasks],
   );
 
@@ -100,6 +111,16 @@ export default function PickingPage() {
     if (orderId) startSession(trolley || null, rack || null, orderId);
   };
 
+  const autoStarted = useRef(false);
+
+  // Auto-start if orderId is in URL and no session is active
+  useEffect(() => {
+    if (urlOrderId && !sessionActive && !autoStarted.current) {
+      autoStarted.current = true;
+      setOrderId(urlOrderId);
+      startSession(null, null, urlOrderId);
+    }
+  }, [urlOrderId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="flex flex-col gap-6">
@@ -143,12 +164,12 @@ export default function PickingPage() {
         </div>
       )}
 
-      {/* Session active â€” progress bar */}
+      {/* Session active — progress bar */}
       {sessionActive && (
         <div className="glass-card rounded-2xl p-4 flex items-center gap-4">
           <div className="flex-1">
             <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
-              <span className="font-medium text-foreground">Pick session in progress</span>
+              <span className="font-medium text-foreground">Pick session in progress — Order #{orderId}</span>
               <span>
                 {pickedCount} / {totalCount} items picked
               </span>
@@ -185,7 +206,7 @@ export default function PickingPage() {
           <div className="relative">
             <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
             <Input
-              placeholder="Filter by SKU or binâ€¦"
+              placeholder="Filter by SKU, bin, SO#, order ID…"
               className="pl-8 h-8 text-sm"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -219,10 +240,10 @@ export default function PickingPage() {
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
                     <TableHead>#</TableHead>
+                    <TableHead>Order</TableHead>
                     <TableHead>SKU</TableHead>
                     <TableHead>Bin</TableHead>
                     <TableHead>Qty</TableHead>
-                    <TableHead>Order</TableHead>
                     <TableHead>Status</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -230,16 +251,18 @@ export default function PickingPage() {
                   {filteredTasks.map((task, idx) => (
                     <TableRow key={task.id} className="table-row-hover">
                       <TableCell className="text-muted-foreground text-xs">{idx + 1}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-mono text-xs font-medium text-primary">{task.soNumber ?? `#${task.orderId}`}</p>
+                        </div>
+                      </TableCell>
                       <TableCell className="font-mono text-xs">
                         {task.skuCode ?? task.sku}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-primary font-medium">
                         {task.binBarcode ?? task.bin}
                       </TableCell>
-                      <TableCell>{task.requiredQty ?? task.quantity ?? 1}</TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
-                        {task.orderId ? `#${task.orderId}` : '—'}
-                      </TableCell>
+                      <TableCell>{task.quantity ?? 1}</TableCell>
                       <TableCell>
                         <StatusBadge status={task.status ?? 'PENDING'} />
                       </TableCell>
@@ -349,7 +372,7 @@ export default function PickingPage() {
 
               {progress === 100 && (
                 <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-4 text-center text-sm font-medium text-emerald-600 dark:text-emerald-400">
-                  âœ“ All items picked â€” ready for packing!
+                  ✓ All items picked — ready for packing!
                 </div>
               )}
             </div>

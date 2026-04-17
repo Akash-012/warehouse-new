@@ -9,5 +9,6 @@ import java.util.List;
 @Builder
 public class PackingManifest {
     Long orderId;
+    String customerName;
     List<PackingManifestLine> lines;
 }

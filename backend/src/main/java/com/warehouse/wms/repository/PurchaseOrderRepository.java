@@ -26,4 +26,12 @@ public interface PurchaseOrderRepository extends JpaRepository<PurchaseOrder, Lo
     Optional<PurchaseOrder> findByIdWithLines(@Param("id") Long id);
 
     boolean existsByPoNumber(String poNumber);
+
+    /** Returns [poId, skuId, receivedCount] for all non-SHIPPED inventory linked to the given PO ids. */
+    @Query("SELECT i.goodsReceiptLine.goodsReceipt.purchaseOrder.id, i.sku.id, COUNT(i) " +
+           "FROM Inventory i " +
+           "WHERE i.goodsReceiptLine.goodsReceipt.purchaseOrder.id IN :poIds " +
+           "AND i.state <> com.warehouse.wms.entity.Inventory.InventoryState.SHIPPED " +
+           "GROUP BY i.goodsReceiptLine.goodsReceipt.purchaseOrder.id, i.sku.id")
+    List<Object[]> countReceivedByPoIds(@Param("poIds") List<Long> poIds);
 }

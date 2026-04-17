@@ -26,7 +26,7 @@ import * as z from 'zod';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Database, Plus, Package, Search, X, Download, Pencil, CheckCircle2 } from 'lucide-react';
+import { Database, Plus, Package, Search, X, Download, Pencil, Trash2, CheckCircle2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { exportWmsWorkbook } from '@/lib/exportExcel';
 import SlideOverForm from '@/components/ui/SlideOverForm';
@@ -111,6 +111,15 @@ const BinsPage = () => {
       reset();
     },
     onError: (err) => toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Failed to update bin.'),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => api.delete(`/master/bins/${id}`),
+    onSuccess: () => {
+      toast.success('Bin deleted.');
+      queryClient.invalidateQueries({ queryKey: ['bins'] });
+    },
+    onError: (err) => toast.error(err?.response?.data?.detail || err?.response?.data?.message || 'Failed to delete bin.'),
   });
 
   const onSubmit = (data) => {
@@ -326,6 +335,15 @@ const BinsPage = () => {
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => openEdit(bin)}>
                       <Pencil className="size-3.5 mr-1" /> Edit
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                      onClick={() => deleteMutation.mutate(bin.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="size-3.5 mr-1" /> Delete
                     </Button>
                   </TableCell>
                 </TableRow>
