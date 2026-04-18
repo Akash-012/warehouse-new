@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-17.0.18.8-hotspot\" cd d:/Ak01/warehouse-new/backend)",
+      "Bash(JAVA_HOME=\"/c/Program Files/Eclipse Adoptium/jdk-17.0.18.8-hotspot\" /d/Ak01/apache-maven-3.9.6/bin/mvn spring-boot:run)",
+      "Read(//c/Program Files/Eclipse Adoptium/jdk-17.0.18.8-hotspot/bin/**)",
+      "Bash(JAVA_HOME=\"C:/Program Files/Zulu/zulu-17\" /d/Ak01/apache-maven-3.9.6/bin/mvn spring-boot:run)",
+      "Bash(powershell.exe -Command \"netstat -an | Select-String '3306'\")",
+      "Bash(powershell.exe -Command \"& 'C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe' -u root -e 'USE wms_db; SELECT username, password FROM users LIMIT 5;' 2>&1\")",
+      "Bash(/c/xampp/mysql/bin/mysql.exe -u root -e \"SHOW DATABASES; USE wms_db; SHOW TABLES;\")",
+      "Bash(/c/xampp/mysql/bin/mysql.exe -u root -e \"USE wms_db; SELECT username, role, active FROM _user LIMIT 10;\")",
+      "Bash(npm run *)"
+    ]
+  }
+}

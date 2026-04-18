@@ -86,7 +86,7 @@ function NavItem({ item, isCollapsed, liveValue, isFavorite, onToggleFavorite })
       className={cn(
         'group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-[0.8125rem] font-medium transition-all duration-150 ease-out',
         active
-          ? 'bg-gradient-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-primary shadow-sm before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-r before:bg-gradient-to-b before:from-sidebar-primary before:to-sidebar-primary/70'
+          ? 'bg-linear-to-r from-sidebar-primary/20 to-sidebar-primary/10 text-sidebar-primary shadow-sm before:absolute before:left-0 before:top-1/2 before:h-5 before:w-0.5 before:-translate-y-1/2 before:rounded-r before:bg-linear-to-b before:from-sidebar-primary before:to-sidebar-primary/70'
           : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground',
         isCollapsed && 'justify-center px-2',
         'relative overflow-hidden'
@@ -95,7 +95,7 @@ function NavItem({ item, isCollapsed, liveValue, isFavorite, onToggleFavorite })
       {/* Background shine effect */}
       <div className={cn(
         'absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300',
-        'bg-gradient-to-r from-transparent via-white/5 to-transparent pointer-events-none'
+        'bg-linear-to-r from-transparent via-white/5 to-transparent pointer-events-none'
       )} />
 
       <item.icon className={cn(
@@ -122,7 +122,7 @@ function NavItem({ item, isCollapsed, liveValue, isFavorite, onToggleFavorite })
 
           {/* Count badge */}
           {!showFavStar && liveValue > 0 && (
-            <span className="ml-auto inline-flex items-center justify-center rounded-full bg-gradient-to-br from-sidebar-primary to-sidebar-primary/80 px-2 py-0.5 text-[10px] font-bold text-sidebar-primary-foreground shadow-sm leading-none">
+            <span className="ml-auto inline-flex items-center justify-center rounded-full bg-linear-to-br from-sidebar-primary to-sidebar-primary/80 px-2 py-0.5 text-[10px] font-bold text-sidebar-primary-foreground shadow-sm leading-none">
               {liveValue > 99 ? '99+' : liveValue}
             </span>
           )}
@@ -131,7 +131,7 @@ function NavItem({ item, isCollapsed, liveValue, isFavorite, onToggleFavorite })
 
       {/* Collapsed mode dot */}
       {isCollapsed && liveValue > 0 && (
-        <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-gradient-to-br from-sidebar-primary to-sidebar-primary/70 animate-pulse shadow-lg" />
+        <span className="absolute right-1.5 top-1.5 size-2.5 rounded-full bg-linear-to-br from-sidebar-primary to-sidebar-primary/70 animate-pulse shadow-lg" />
       )}
     </Link>
   );
@@ -346,10 +346,10 @@ const Sidebar = () => {
       )}
     >
       {/* ── Header: Logo + Notifications ── */}
-      <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border bg-gradient-to-r from-sidebar to-sidebar/95 px-4 transition-all duration-200">
+      <div className="flex h-14 shrink-0 items-center justify-between border-b border-sidebar-border bg-linear-to-r from-sidebar to-sidebar/95 px-4 transition-all duration-200">
         <div className={cn('flex items-center gap-3 overflow-hidden min-w-0', isCollapsed && 'justify-center')}>
           {/* Logo badge */}
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 text-[13px] font-extrabold text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-linear-to-br from-blue-500 to-blue-600 text-[13px] font-extrabold text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105">
             W
           </div>
 
@@ -372,7 +372,7 @@ const Sidebar = () => {
               >
                 <Bell className="size-4" />
                 {notifCount > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex size-5 items-center justify-center rounded-full bg-gradient-to-br from-red-500 to-red-600 text-[9px] font-bold text-white shadow-md leading-none">
+                  <span className="absolute -right-1 -top-1 inline-flex size-5 items-center justify-center rounded-full bg-linear-to-br from-red-500 to-red-600 text-[9px] font-bold text-white shadow-md leading-none">
                     {notifCount > 9 ? '9+' : notifCount}
                   </span>
                 )}
@@ -388,7 +388,7 @@ const Sidebar = () => {
       {/* ── Live Queue Card with Enhanced Stats ── */}
       <div className="px-3 pt-3 pb-2">
         <div className={cn(
-          'rounded-xl border border-sidebar-border/60 bg-gradient-to-br from-sidebar-accent/60 to-sidebar-accent/20 p-3.5 transition-all duration-300',
+          'rounded-xl border border-sidebar-border/60 bg-linear-to-br from-sidebar-accent/60 to-sidebar-accent/20 p-3.5 transition-all duration-300',
           'hover:border-sidebar-border hover:shadow-md',
           isCollapsed && 'flex items-center justify-center px-2 py-3'
         )}>
@@ -495,7 +495,7 @@ const Sidebar = () => {
       </nav>
 
       {/* ── Divider ── */}
-      <div className="h-px bg-gradient-to-r from-sidebar-border/0 via-sidebar-border/50 to-sidebar-border/0" />
+      <div className="h-px bg-linear-to-r from-sidebar-border/0 via-sidebar-border/50 to-sidebar-border/0" />
 
       {/* ── Footer: User + Theme ── */}
       <div className="shrink-0">
@@ -504,7 +504,7 @@ const Sidebar = () => {
           'flex items-center gap-3 px-3 py-3 transition-all duration-200',
           isCollapsed && 'justify-center px-2'
         )}>
-          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-500/40 to-indigo-500/40 ring-1.5 ring-sidebar-border text-[12px] font-bold text-sidebar-primary/80 hover:ring-sidebar-primary/40 transition-all duration-200">
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-linear-to-br from-blue-500/40 to-indigo-500/40 ring-1.5 ring-sidebar-border text-[12px] font-bold text-sidebar-primary/80 hover:ring-sidebar-primary/40 transition-all duration-200">
             {displayName.slice(0, 2).toUpperCase()}
           </div>
           {!isCollapsed && (

@@ -206,7 +206,15 @@ export async function exportCsvEndpointAsWmsExcel({
   sheetName,
   title,
 }) {
-  const response = await fetch(endpoint, {
+  const rawApiBaseUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+  const apiBaseUrl = rawApiBaseUrl ? rawApiBaseUrl.replace(/\/$/, '') : '';
+  const requestUrl = /^https?:\/\//i.test(endpoint)
+    ? endpoint
+    : apiBaseUrl
+      ? `${apiBaseUrl}${endpoint.startsWith('/') ? endpoint : `/${endpoint}`}`
+      : endpoint;
+
+  const response = await fetch(requestUrl, {
     headers: { Accept: 'text/csv,text/plain,*/*' },
   });
 

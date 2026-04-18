@@ -48,7 +48,12 @@ export default function ReportsPage() {
 
   const { data: inventoryByState } = useQuery({
     queryKey: ['inventory-by-state'],
-    queryFn: () => api.get('/reports/inventory-by-state').then((r) => r.data),
+    queryFn: () =>
+      api.get('/reports/inventory-by-state').then((r) => {
+        const raw = r.data;
+        if (Array.isArray(raw)) return raw;
+        return Object.entries(raw ?? {}).map(([state, count]) => ({ state, count: Number(count ?? 0) }));
+      }),
     staleTime: 60_000,
   });
 
@@ -133,10 +138,10 @@ export default function ReportsPage() {
       {/* KPI row */}
       {kpis && (
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-          <StatCard title="Total SKUs"       value={kpis.totalSkus ?? 'â€”'}       icon={Boxes}        kpiVariant="blue"   accentClass="text-blue-500"    iconBg="bg-blue-500/10" />
-          <StatCard title="Open Orders"      value={kpis.openOrders ?? 'â€”'}      icon={ShoppingCart} kpiVariant="amber"  accentClass="text-amber-500"   iconBg="bg-amber-500/10" />
-          <StatCard title="Pending Picks"    value={kpis.pendingPicks ?? 'â€”'}    icon={BarChart2}    kpiVariant="rose"   accentClass="text-rose-500"    iconBg="bg-rose-500/10" />
-          <StatCard title="Shipments Today"  value={kpis.shipmentsToday ?? 'â€”'}  icon={Ship}         kpiVariant="green"  accentClass="text-emerald-500" iconBg="bg-emerald-500/10" />
+          <StatCard title="Total SKUs"       value={kpis.totalSkus ?? '-'}       icon={Boxes}        kpiVariant="blue"   accentClass="text-blue-500"    iconBg="bg-blue-500/10" />
+          <StatCard title="Open Orders"      value={kpis.openOrders ?? '-'}      icon={ShoppingCart} kpiVariant="amber"  accentClass="text-amber-500"   iconBg="bg-amber-500/10" />
+          <StatCard title="Pending Picks"    value={kpis.pendingPicks ?? '-'}    icon={BarChart2}    kpiVariant="rose"   accentClass="text-rose-500"    iconBg="bg-rose-500/10" />
+          <StatCard title="Shipments Today"  value={kpis.shipmentsToday ?? '-'}  icon={Ship}         kpiVariant="green"  accentClass="text-emerald-500" iconBg="bg-emerald-500/10" />
         </div>
       )}
 
@@ -210,7 +215,7 @@ export default function ReportsPage() {
         <div className="flex items-center gap-2">
           <TrendingUp className="size-4 text-primary" />
           <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">Shipments Trend</h2>
-          <span className="ml-auto text-xs text-muted-foreground">{fromDate} â€” {toDate}</span>
+          <span className="ml-auto text-xs text-muted-foreground">{fromDate} - {toDate}</span>
         </div>
         {shipmentsTrend?.length ? (
           <ResponsiveContainer width="100%" height={220}>
@@ -239,7 +244,7 @@ export default function ReportsPage() {
         ) : (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-muted-foreground">
             <TrendingUp className="size-10 opacity-30" />
-            <p className="text-sm">No shipment trend data â€” adjust the date range above</p>
+            <p className="text-sm">No shipment trend data - adjust the date range above</p>
           </div>
         )}
       </div>
