@@ -76,6 +76,7 @@ public class InboundService {
             m.put("remainingQty",   remaining);
             m.put("quantity",       remaining);
             m.put("batchNo",        autoBatch);
+            m.put("category",       sku.getCategory());
             m.put("unitPrice",      line.getUnitPrice());
             m.put("sgstRate",       line.getSgstRate());
             m.put("cgstRate",       line.getCgstRate());
@@ -127,9 +128,16 @@ public class InboundService {
             }
 
             GoodsReceiptLine grnLine = new GoodsReceiptLine();
+            // Update SKU category if provided during receiving
+            if (lineRequest.getCategory() != null && !lineRequest.getCategory().isBlank()) {
+                sku.setCategory(lineRequest.getCategory());
+                skuRepository.save(sku);
+            }
+
             grnLine.setGoodsReceipt(goodsReceipt);
             grnLine.setSku(sku);
             grnLine.setBatchNo(batchNo);
+            grnLine.setExpiryDate(lineRequest.getExpiryDate());
             grnLine.setQuantityReceived(lineRequest.getQuantity());
             grnLine = goodsReceiptLineRepository.save(grnLine);
             grnLines.add(grnLine);
@@ -140,9 +148,10 @@ public class InboundService {
                 inventory.setSku(sku);
                 inventory.setBin(receiveDock);
                 inventory.setBatchNo(batchNo);
+                inventory.setExpiryDate(lineRequest.getExpiryDate());
                 inventory.setQuantity(1);
                 inventory.setState(Inventory.InventoryState.RECEIVED);
-                inventory.setSerialNo(buildItemBarcode(sku.getSkuCode(), batchNo, existingCount + i));
+                inventory.setSerialNo(buildItemBarcode(sku.getId(), goodsReceipt.getId(), existingCount + i));
                 inventory.setGoodsReceiptLine(grnLine);
                 inventoryRepository.save(inventory);
             }
@@ -163,6 +172,27 @@ public class InboundService {
         putawayEngineService.generatePutawayTasks(saved.getId());
 
         return toGrnResponse(saved, totalItems);
+    }
+
+    @Transactional(readOnly = true)
+    public List<Map<String, Object>> getGrnItemBarcodes(Long grnId) {
+        GoodsReceipt grn = goodsReceiptRepository.findById(grnId)
+                .orElseThrow(() -> new EntityNotFoundException("GRN not found: " + grnId));
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (GoodsReceiptLine line : grn.getLines()) {
+            List<Inventory> items = inventoryRepository
+                    .findByGoodsReceiptLineId(line.getId());
+            for (Inventory inv : items) {
+                if (inv.getSerialNo() == null) continue;
+                Map<String, Object> m = new LinkedHashMap<>();
+                m.put("barcode",     inv.getSerialNo());
+                m.put("skuCode",     inv.getSku().getSkuCode());
+                m.put("description", inv.getSku().getDescription());
+                m.put("batchNo",     inv.getBatchNo());
+                result.add(m);
+            }
+        }
+        return result;
     }
 
     @Transactional(readOnly = true)
@@ -262,8 +292,10 @@ public class InboundService {
         return "GRN-" + poId + "-" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
     }
 
-    private String buildItemBarcode(String skuCode, String batchNo, long sequence) {
-        return skuCode + "-" + batchNo + "-" + String.format("%05d", sequence);
+    private String buildItemBarcode(Long skuId, Long grnId, long sequence) {
+        // Format: WMS + 4-digit skuId + 6-digit grnId + 5-digit sequence
+        // e.g. WMS000100000100001 — pure alphanumeric, scannable as Code128
+        return String.format("WMS%04d%06d%05d", skuId, grnId, sequence);
     }
 
     private Bin ensureSpecialBin(String barcode) {

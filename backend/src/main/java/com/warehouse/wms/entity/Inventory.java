@@ -29,6 +29,9 @@ public class Inventory {
     @Column(name = "batch_no")
     private String batchNo;
 
+    @Column(name = "expiry_date")
+    private java.time.LocalDate expiryDate;
+
     @Column(name = "serial_no", unique = true)
     private String serialNo;
 

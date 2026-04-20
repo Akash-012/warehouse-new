@@ -27,6 +27,11 @@ public class InboundController {
         return ResponseEntity.ok(inboundService.receivePO(request));
     }
 
+    @GetMapping("/grn/{id}/item-barcodes")
+    public ResponseEntity<List<Map<String, Object>>> getGrnItemBarcodes(@PathVariable Long id) {
+        return ResponseEntity.ok(inboundService.getGrnItemBarcodes(id));
+    }
+
     @GetMapping("/grns")
     public ResponseEntity<List<GRNResponse>> listGRNs() {
         return ResponseEntity.ok(inboundService.listAllGRNs());

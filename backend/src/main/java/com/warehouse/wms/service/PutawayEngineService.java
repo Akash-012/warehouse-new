@@ -21,7 +21,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class PutawayEngineService {
 
-    private static final String OVERFLOW_BIN = "OVERFLOW";
+    private static final String OVERFLOW_BIN = "STAGING-AREA";
 
     private final InventoryRepository inventoryRepository;
     private final SkuDimensionRepository skuDimensionRepository;
@@ -58,7 +58,20 @@ public class PutawayEngineService {
             PutawayTask task = new PutawayTask();
             task.setInventory(inventory);
             task.setSuggestedBin(suggested);
-            task.setPriority(1);
+
+            // Derive priority from PO: P1=1, P2=2, P3=3 (default 2)
+            var grl = inventory.getGoodsReceiptLine();
+            var gr  = grl != null ? grl.getGoodsReceipt() : null;
+            var po  = gr  != null ? gr.getPurchaseOrder() : null;
+            int taskPriority = 2;
+            if (po != null && po.getPriority() != null) {
+                taskPriority = switch (po.getPriority()) {
+                    case P1 -> 1;
+                    case P2 -> 2;
+                    case P3 -> 3;
+                };
+            }
+            task.setPriority(taskPriority);
             task.setStatus(PutawayTask.PutawayTaskStatus.PENDING);
             if (suggested.getRack() != null && suggested.getRack().getAisle() != null && suggested.getRack().getAisle().getZone() != null) {
                 task.setWarehouse(suggested.getRack().getAisle().getZone().getWarehouse());
@@ -68,9 +81,6 @@ public class PutawayEngineService {
             inventory.setState(Inventory.InventoryState.IN_PUTAWAY);
             inventoryRepository.save(inventory);
 
-            var grl = inventory.getGoodsReceiptLine();
-            var gr  = grl != null ? grl.getGoodsReceipt() : null;
-            var po  = gr  != null ? gr.getPurchaseOrder() : null;
             responses.add(PutawayTaskResponse.builder()
                     .taskId(task.getId())
                     .inventoryId(inventory.getId())
@@ -89,6 +99,11 @@ public class PutawayEngineService {
     }
 
     private Bin ensureOverflowBin() {
+        // Migrate legacy OVERFLOW barcode if it exists
+        binRepository.findByBarcode("OVERFLOW").ifPresent(old -> {
+            old.setBarcode(OVERFLOW_BIN);
+            binRepository.save(old);
+        });
         return binRepository.findByBarcode(OVERFLOW_BIN).orElseGet(() -> {
             Bin bin = new Bin();
             bin.setBarcode(OVERFLOW_BIN);

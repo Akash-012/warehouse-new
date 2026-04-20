@@ -16,4 +16,10 @@ public class ReceivePOLineRequest {
 
     // Optional — auto-generated as BATCH-{YYYYMM}-{skuCode} if blank
     private String batchNo;
+
+    // Optional — expiry date for this batch
+    private java.time.LocalDate expiryDate;
+
+    // Optional — updates the SKU's category on receive
+    private String category;
 }

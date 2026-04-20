@@ -21,15 +21,21 @@ public class CreatePORequest {
 
     private LocalDate expectedArrivalDate;
 
+    private com.warehouse.wms.entity.PurchaseOrder.Priority priority;
+
     @NotEmpty(message = "At least one product line is required")
     @Valid
     private List<LineItem> lines;
 
     @Data
     public static class LineItem {
-        @NotNull(message = "SKU ID is required")
+        // Either skuId (existing SKU) OR productName (auto-creates new SKU)
         @Positive
         private Long skuId;
+
+        private String productName;
+
+        private String category;
 
         @NotNull(message = "Quantity is required")
         @Positive

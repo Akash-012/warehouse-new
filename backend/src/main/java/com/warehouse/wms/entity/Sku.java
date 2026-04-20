@@ -17,6 +17,12 @@ public class Sku {
 
     private String description;
 
+    @Column(name = "category")
+    private String category;
+
+    @Column(name = "low_stock_threshold")
+    private Integer lowStockThreshold;
+
     @ToString.Exclude
     @EqualsAndHashCode.Exclude
     @OneToOne(mappedBy = "sku", cascade = CascadeType.ALL)

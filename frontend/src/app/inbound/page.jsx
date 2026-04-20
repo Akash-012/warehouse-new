@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as z from 'zod';
 import { format } from 'date-fns';
-import { Download, Loader2, Package, Plus, Search, Trash2, X, ClipboardList, FilePlus, Pencil } from 'lucide-react';
+import { Download, Loader2, Package, Plus, Search, Trash2, X, ClipboardList, FilePlus, Pencil, AlertTriangle } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
 import StatCard from '@/components/StatCard';
@@ -37,6 +37,8 @@ const receiveSchema = z.object({
     skuCode: z.string().min(1, 'SKU code is required'),
     quantity: z.coerce.number().int().min(1, 'Minimum 1'),
     batchNo: z.string().min(1, 'Batch number is required'),
+    category: z.string().optional(),
+    expiryDate: z.string().optional(),
   })).min(1, 'At least one line is required'),
 });
 
@@ -44,15 +46,224 @@ const createPoSchema = z.object({
   warehouseId: z.coerce.number().int().positive('Warehouse is required'),
   supplier: z.string().min(1, 'Supplier is required'),
   expectedArrivalDate: z.string().optional(),
+  priority: z.enum(['P1', 'P2', 'P3']).optional(),
   lines: z.array(z.object({
-    skuId: z.coerce.number().int().positive('SKU ID is required'),
-    skuName: z.string().optional(),
+    productName: z.string().min(1, 'Product name is required'),
+    category: z.string().optional(),
     quantity: z.coerce.number().int().min(1, 'Minimum 1'),
     unitPrice: z.coerce.number().min(0, 'Must be ≥ 0').optional(),
     sgstRate: z.coerce.number().min(0).max(100).optional(),
     cgstRate: z.coerce.number().min(0).max(100).optional(),
   })).min(1, 'At least one product is required'),
 });
+
+// Categories that require expiry date (mandatory)
+const EXPIRY_REQUIRED = ['Food', 'Medicine', 'Pharmaceutical', 'Perishable', 'Dairy', 'Beverage', 'Chemical'];
+// Categories where expiry is optional
+const EXPIRY_OPTIONAL = ['Cosmetics', 'Healthcare', 'Supplement'];
+// All selectable categories
+const ALL_CATEGORIES = [...EXPIRY_REQUIRED, ...EXPIRY_OPTIONAL, 'Electronics', 'Apparel', 'Stationery', 'Hardware', 'Other'];
+
+const expiryMode = (cat) => {
+  if (!cat) return 'none';
+  if (EXPIRY_REQUIRED.some((x) => x.toLowerCase() === cat.toLowerCase())) return 'required';
+  if (EXPIRY_OPTIONAL.some((x) => x.toLowerCase() === cat.toLowerCase())) return 'optional';
+  return 'none';
+};
+
+const needsExpiry = (cat) => !!cat && EXPIRY_REQUIRED.some((x) => x.toLowerCase() === cat.toLowerCase());
+const mayHaveExpiry = (cat) => !!cat && (needsExpiry(cat) || EXPIRY_OPTIONAL.some((x) => x.toLowerCase() === cat.toLowerCase()));
+
+// Component for a single receive line — needs useWatch so expiry reacts to category change
+function ReceiveLine({ index, field, register, control, setValue, errors, remove, showRemove, selectedPO, lowStockMap }) {
+  const category = useWatch({ control, name: `lines.${index}.category`, defaultValue: '' });
+  const mode = expiryMode(category);
+  const skuInfo = lowStockMap[field.skuCode];
+
+  return (
+    <div className="rounded-xl border border-border/60 p-3 space-y-2.5 relative">
+      {field._ordered != null && (
+        <div className="flex gap-3 text-xs text-muted-foreground">
+          <span>Ordered: <strong className="text-foreground">{field._ordered}</strong></span>
+          <span>Received: <strong className="text-foreground">{field._alreadyReceived}</strong></span>
+          <span>Remaining: <strong className="text-orange-500">{field._remaining}</strong></span>
+        </div>
+      )}
+      {skuInfo?.lowStockThreshold != null && (
+        <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+          skuInfo.isLowStock ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+        }`}>
+          <AlertTriangle className="size-3.5 shrink-0" />
+          {skuInfo.isLowStock
+            ? `Low stock! Only ${Number(skuInfo.availableQty).toLocaleString()} units available (threshold: ${skuInfo.lowStockThreshold})`
+            : `Stock alert set at ${skuInfo.lowStockThreshold} units — currently ${Number(skuInfo.availableQty).toLocaleString()} available`}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs">SKU Code</Label>
+          <Input
+            placeholder="e.g. SKU-001"
+            className="h-8 text-sm"
+            readOnly={!!selectedPO?.lines?.length}
+            {...register(`lines.${index}.skuCode`)}
+          />
+          {errors.lines?.[index]?.skuCode && <p className="text-[10px] text-destructive">{errors.lines[index].skuCode.message}</p>}
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Qty to Receive {field._remaining != null && <span className="text-muted-foreground">(max {field._remaining})</span>}</Label>
+          <Input
+            type="number" min={1} max={field._remaining ?? undefined}
+            className="h-8 text-sm"
+            {...register(`lines.${index}.quantity`)}
+          />
+          {errors.lines?.[index]?.quantity && <p className="text-[10px] text-destructive">{errors.lines[index].quantity.message}</p>}
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Batch Number</Label>
+        <Input placeholder="BATCH-2026-001" className="h-8 text-sm font-mono" {...register(`lines.${index}.batchNo`)} />
+        {errors.lines?.[index]?.batchNo && <p className="text-[10px] text-destructive">{errors.lines[index].batchNo.message}</p>}
+      </div>
+      {/* Category selector */}
+      <div className="space-y-1">
+        <Label className="text-xs">Category <span className="text-muted-foreground">(optional)</span></Label>
+        <Select
+          value={category || ''}
+          onValueChange={(v) => setValue(`lines.${index}.category`, v === '__none__' ? '' : v, { shouldValidate: true })}
+        >
+          <SelectTrigger className="h-8 text-sm">
+            <SelectValue placeholder="Select category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">No category</SelectItem>
+            <Separator className="my-1" />
+            <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Requires Expiry</p>
+            {EXPIRY_REQUIRED.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <Separator className="my-1" />
+            <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Optional Expiry</p>
+            {EXPIRY_OPTIONAL.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <Separator className="my-1" />
+            <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">No Expiry</p>
+            {['Electronics', 'Apparel', 'Stationery', 'Hardware', 'Other'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {/* Expiry date — shown only when category needs it */}
+      {mode !== 'none' && (
+        <div className="space-y-1">
+          <Label className="text-xs">
+            Expiry Date
+            {mode === 'required'
+              ? <span className="text-rose-500 ml-1">* required for {category}</span>
+              : <span className="text-muted-foreground ml-1">(optional for {category})</span>}
+          </Label>
+          <Input
+            type="date"
+            className={`h-8 text-sm ${mode === 'required' ? 'border-rose-400 focus-visible:ring-rose-400' : ''}`}
+            {...register(`lines.${index}.expiryDate`)}
+          />
+        </div>
+      )}
+      {showRemove && (
+        <button type="button" onClick={remove} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors">
+          <Trash2 className="size-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Single line in the Receive PO form — extracted to allow useWatch per-line
+function ReceiveLineItem({ i, field, register, control, setValue, errors, remove, showRemove, selectedPO, lowStockMap }) {
+  const category = useWatch({ control, name: `lines.${i}.category`, defaultValue: '' });
+  const requiresExpiry = needsExpiry(category);
+  const showExpiry = mayHaveExpiry(category);
+  const skuInfo = lowStockMap[field.skuCode];
+
+  return (
+    <div className="rounded-xl border border-border/60 p-3 space-y-2.5 relative">
+      {field._ordered != null && (
+        <div className="flex gap-3 text-xs text-muted-foreground">
+          <span>Ordered: <strong className="text-foreground">{field._ordered}</strong></span>
+          <span>Received: <strong className="text-foreground">{field._alreadyReceived}</strong></span>
+          <span>Remaining: <strong className="text-orange-500">{field._remaining}</strong></span>
+        </div>
+      )}
+      {category && (
+        <div className="flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1 rounded-full text-xs font-semibold px-2.5 py-0.5 ${
+            requiresExpiry ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400' : 'bg-violet-500/10 text-violet-700 dark:text-violet-400'
+          }`}>{category}</span>
+          {requiresExpiry && <span className="text-[10px] text-rose-600 dark:text-rose-400 font-medium">Expiry date required</span>}
+        </div>
+      )}
+      {skuInfo?.lowStockThreshold != null && (
+        <div className={`flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ${
+          skuInfo.isLowStock ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400'
+        }`}>
+          <AlertTriangle className="size-3.5 shrink-0" />
+          {skuInfo.isLowStock
+            ? `Low stock! Only ${Number(skuInfo.availableQty).toLocaleString()} units available (threshold: ${skuInfo.lowStockThreshold})`
+            : `Stock alert set at ${skuInfo.lowStockThreshold} units — currently ${Number(skuInfo.availableQty).toLocaleString()} available`}
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label className="text-xs">SKU Code</Label>
+          <Input placeholder="e.g. SKU-001" className="h-8 text-sm" readOnly={!!selectedPO?.lines?.length} {...register(`lines.${i}.skuCode`)} />
+          {errors.lines?.[i]?.skuCode && <p className="text-[10px] text-destructive">{errors.lines[i].skuCode.message}</p>}
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs">Qty to Receive {field._remaining != null && <span className="text-muted-foreground">(max {field._remaining})</span>}</Label>
+          <Input type="number" min={1} max={field._remaining ?? undefined} className="h-8 text-sm" {...register(`lines.${i}.quantity`)} />
+          {errors.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errors.lines[i].quantity.message}</p>}
+        </div>
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Batch Number</Label>
+        <Input placeholder="BATCH-2026-001" className="h-8 text-sm font-mono" {...register(`lines.${i}.batchNo`)} />
+        {errors.lines?.[i]?.batchNo && <p className="text-[10px] text-destructive">{errors.lines[i].batchNo.message}</p>}
+      </div>
+      <div className="space-y-1">
+        <Label className="text-xs">Category <span className="text-muted-foreground">(optional — updates SKU)</span></Label>
+        <Select
+          value={category || ''}
+          onValueChange={(v) => setValue(`lines.${i}.category`, v === '__none__' ? '' : v, { shouldValidate: true })}
+        >
+          <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">No category</SelectItem>
+            <Separator className="my-1" />
+            <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Requires Expiry</p>
+            {EXPIRY_REQUIRED.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <Separator className="my-1" />
+            <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">Optional Expiry</p>
+            {EXPIRY_OPTIONAL.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+            <Separator className="my-1" />
+            <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">No Expiry</p>
+            {['Electronics', 'Apparel', 'Stationery', 'Hardware', 'Other'].map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      {showExpiry && (
+        <div className="space-y-1">
+          <Label className="text-xs">
+            Expiry Date
+            {requiresExpiry ? <span className="text-rose-500 ml-1">* required for {category}</span> : <span className="text-muted-foreground ml-1">(optional for {category})</span>}
+          </Label>
+          <Input type="date" className={`h-8 text-sm ${requiresExpiry ? 'border-rose-400 focus-visible:ring-rose-400' : ''}`} {...register(`lines.${i}.expiryDate`)} />
+          {errors.lines?.[i]?.expiryDate && <p className="text-[10px] text-destructive">{errors.lines[i].expiryDate.message}</p>}
+        </div>
+      )}
+      {showRemove && (
+        <button type="button" onClick={remove} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors">
+          <Trash2 className="size-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}
 
 // Safely parse date strings including "yyyy-MM-dd HH:mm:ss" format
 const parseDate = (val) => {
@@ -107,6 +318,7 @@ export default function InboundPage() {
   const [grnResult, setGrnResult] = useState(null);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [priorityFilter, setPriorityFilter] = useState('ALL');
   const [selectedPoId, setSelectedPoId] = useState('');
 
 
@@ -119,7 +331,7 @@ export default function InboundPage() {
 
   const { register, control, handleSubmit, reset, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(receiveSchema),
-    defaultValues: { poId: '', priority: undefined, lines: [{ skuCode: '', quantity: 1, batchNo: '' }] },
+    defaultValues: { poId: '', priority: undefined, lines: [{ skuCode: '', quantity: 1, batchNo: '', category: '', expiryDate: '' }] },
   });
 
   const receivePriority = useWatch({ control, name: 'priority', defaultValue: undefined });
@@ -147,10 +359,11 @@ export default function InboundPage() {
     formState: { errors: errorsPo },
   } = useForm({
     resolver: zodResolver(createPoSchema),
-    defaultValues: { warehouseId: '', supplier: '', expectedArrivalDate: '', lines: [{ skuId: '', skuName: '', quantity: 1, unitPrice: '', sgstRate: '', cgstRate: '' }] },
+    defaultValues: { warehouseId: '', supplier: '', expectedArrivalDate: '', priority: 'P2', lines: [{ productName: '', category: '', quantity: 1, unitPrice: '', sgstRate: '', cgstRate: '' }] },
   });
 
   const { fields: poLines, append: appendPoLine, remove: removePoLine } = useFieldArray({ control: controlPo, name: 'lines' });
+  const createPoPriority = useWatch({ control: controlPo, name: 'priority', defaultValue: 'P2' });
 
   const { data: warehouses } = useQuery({
     queryKey: ['warehouses'],
@@ -163,6 +376,25 @@ export default function InboundPage() {
     queryFn: () => api.get('/master/skus').then((r) => r.data ?? []),
     staleTime: 60_000,
   });
+
+  const { data: stockSummary } = useQuery({
+    queryKey: ['stockSummary'],
+    queryFn: () => api.get('/inventory/stock-summary').then((r) => r.data ?? []),
+    staleTime: 30_000,
+  });
+
+  const lowStockMap = useMemo(() => {
+    const map = {};
+    (stockSummary ?? []).forEach((s) => { map[s.skuCode] = s; });
+    return map;
+  }, [stockSummary]);
+
+  const skuMap = useMemo(() => {
+    const map = {};
+    (skus ?? []).forEach((s) => { map[s.skuCode] = s; });
+    return map;
+  }, [skus]);
+
 
   const createPoMutation = useMutation({
     mutationFn: (payload) => api.post('/purchase-orders', payload),
@@ -252,10 +484,13 @@ export default function InboundPage() {
     const lines = (selectedPO.lines ?? []).map((line) => {
       const alreadyReceived = line.receivedQty ?? 0;
       const remaining = Math.max(1, (line.quantity ?? 1) - alreadyReceived);
+      const skuCategory = skuMap[line.skuCode]?.category ?? line.category ?? '';
       return {
         skuCode: line.skuCode,
         quantity: remaining,
-        batchNo: '',
+        batchNo: line.batchNo ?? '',
+        category: skuCategory,
+        expiryDate: '',
         _ordered: line.quantity,
         _alreadyReceived: alreadyReceived,
         _remaining: remaining,
@@ -263,21 +498,24 @@ export default function InboundPage() {
     });
     reset({
       poId: selectedPO.id,
-      lines: lines.length ? lines : [{ skuCode: '', quantity: 1, batchNo: '' }],
+      lines: lines.length ? lines : [{ skuCode: '', quantity: 1, batchNo: '', category: '', expiryDate: '' }],
     });
-  }, [selectedPO, reset]);
+  }, [selectedPO, reset, skuMap]);
 
   const filteredPOs = useMemo(() => {
     let list = purchaseOrders ?? [];
     if (statusFilter !== 'ALL') {
       list = list.filter((p) => normalizePoStatus(p.status) === statusFilter);
     }
+    if (priorityFilter !== 'ALL') {
+      list = list.filter((p) => p.priority === priorityFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
       list = list.filter((p) => String(p.poNumber ?? '').toLowerCase().includes(q) || String(p.supplier ?? '').toLowerCase().includes(q));
     }
     return list;
-  }, [purchaseOrders, statusFilter, search]);
+  }, [purchaseOrders, statusFilter, priorityFilter, search]);
 
   const stats = useMemo(() => {
     const pos = purchaseOrders ?? [];
@@ -336,8 +574,10 @@ export default function InboundPage() {
               warehouseId: Number(d.warehouseId),
               supplier: d.supplier,
               expectedArrivalDate: d.expectedArrivalDate || undefined,
+              priority: d.priority || 'P2',
               lines: d.lines.map((l) => ({
-                skuId: Number(l.skuId),
+                productName: l.productName,
+                category: l.category || undefined,
                 quantity: Number(l.quantity),
                 unitPrice: l.unitPrice ? Number(l.unitPrice) : undefined,
                 sgstRate: l.sgstRate ? Number(l.sgstRate) : undefined,
@@ -377,40 +617,63 @@ export default function InboundPage() {
             <Input type="date" className="h-10" {...registerPo('expectedArrivalDate')} />
           </div>
 
+          {/* Priority */}
+          <div className="space-y-1.5">
+            <Label>Priority</Label>
+            <Select value={createPoPriority} onValueChange={(v) => setPoValue('priority', v, { shouldValidate: true })}>
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Select priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="P1">P1 — High</SelectItem>
+                <SelectItem value="P2">P2 — Medium</SelectItem>
+                <SelectItem value="P3">P3 — Low</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <Separator />
 
           {/* Product Lines */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <Label>Products</Label>
-              <Button type="button" size="sm" variant="outline" onClick={() => appendPoLine({ skuId: '', skuName: '', quantity: 1, unitPrice: '', sgstRate: '', cgstRate: '' })}>
+              <Button type="button" size="sm" variant="outline" onClick={() => appendPoLine({ productName: '', category: '', quantity: 1, unitPrice: '', sgstRate: '', cgstRate: '' })}>
                 <Plus className="size-3.5 mr-1" /> Add Product
               </Button>
             </div>
             {poLines.map((field, i) => (
               <div key={field.id} className="rounded-xl border border-border/60 p-3 space-y-2.5 relative">
                 <p className="text-xs font-medium text-muted-foreground">Product {i + 1}</p>
+                <div className="space-y-1">
+                  <Label className="text-xs">Product Name <span className="text-destructive">*</span></Label>
+                  <Input placeholder="e.g. Wireless Mouse" className="h-8 text-sm" {...registerPo(`lines.${i}.productName`)} />
+                  {errorsPo.lines?.[i]?.productName && <p className="text-[10px] text-destructive">{errorsPo.lines[i].productName.message}</p>}
+                  <p className="text-[10px] text-muted-foreground">A new SKU code will be auto-generated for new products.</p>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Category <span className="text-muted-foreground">(optional)</span></Label>
+                  <Select onValueChange={(v) => setPoValue(`lines.${i}.category`, v === '__none__' ? '' : v)}>
+                    <SelectTrigger className="h-8 text-sm"><SelectValue placeholder="Select category" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">No category</SelectItem>
+                      <Separator className="my-1" />
+                      {ALL_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div className="grid grid-cols-2 gap-2">
-                  <div className="space-y-1">
-                    <Label className="text-xs">SKU ID</Label>
-                    <Input type="number" min={1} placeholder="e.g. 3" className="h-8 text-sm" {...registerPo(`lines.${i}.skuId`)} />
-                    {errorsPo.lines?.[i]?.skuId && <p className="text-[10px] text-destructive">{errorsPo.lines[i].skuId.message}</p>}
-                  </div>
                   <div className="space-y-1">
                     <Label className="text-xs">Quantity</Label>
                     <Input type="number" min={1} className="h-8 text-sm" {...registerPo(`lines.${i}.quantity`)} />
                     {errorsPo.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errorsPo.lines[i].quantity.message}</p>}
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs">Product Name <span className="text-muted-foreground">(optional)</span></Label>
-                  <Input placeholder="e.g. Widget A" className="h-8 text-sm" {...registerPo(`lines.${i}.skuName`)} />
-                </div>
-                <div className="grid grid-cols-3 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">Unit Price (₹)</Label>
                     <Input type="number" min={0} step="0.01" placeholder="0.00" className="h-8 text-sm" {...registerPo(`lines.${i}.unitPrice`)} />
                   </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
                   <div className="space-y-1">
                     <Label className="text-xs">SGST %</Label>
                     <Input type="number" min={0} max={100} step="0.01" placeholder="9" className="h-8 text-sm" {...registerPo(`lines.${i}.sgstRate`)} />
@@ -474,7 +737,24 @@ export default function InboundPage() {
                         toast.error('Please select a purchase order');
                         return;
                       }
-                      receiveMutation.mutate({ ...d, poId, priority: d.priority || undefined });
+                      // Validate expiry for categories that require it
+                      const missingExpiry = d.lines.find((l) => needsExpiry(l.category) && !l.expiryDate);
+                      if (missingExpiry) {
+                        toast.error(`Expiry date is required for ${missingExpiry.skuCode} (${missingExpiry.category})`);
+                        return;
+                      }
+                      receiveMutation.mutate({
+                        ...d,
+                        poId,
+                        priority: d.priority || undefined,
+                        lines: d.lines.map((l) => ({
+                          skuCode: l.skuCode,
+                          quantity: l.quantity,
+                          batchNo: l.batchNo,
+                          category: l.category || undefined,
+                          expiryDate: l.expiryDate || undefined,
+                        })),
+                      });
                     })}
                     className="space-y-4"
                   >
@@ -520,53 +800,24 @@ export default function InboundPage() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <Label>Lines</Label>
-                        <Button type="button" size="sm" variant="outline" onClick={() => append({ skuCode: '', quantity: 1, batchNo: '' })}>
+                        <Button type="button" size="sm" variant="outline" onClick={() => append({ skuCode: '', quantity: 1, batchNo: '', category: '', expiryDate: '' })}>
                           <Plus className="size-3.5 mr-1" /> Add Line
                         </Button>
                       </div>
                       {fields.map((field, i) => (
-                        <div key={field.id} className="rounded-xl border border-border/60 p-3 space-y-2.5 relative">
-                          {field._ordered != null && (
-                            <div className="flex gap-3 text-xs text-muted-foreground">
-                              <span>Ordered: <strong className="text-foreground">{field._ordered}</strong></span>
-                              <span>Received: <strong className="text-foreground">{field._alreadyReceived}</strong></span>
-                              <span>Remaining: <strong className="text-orange-500">{field._remaining}</strong></span>
-                            </div>
-                          )}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="space-y-1">
-                              <Label className="text-xs">SKU Code</Label>
-                              <Input
-                                placeholder="e.g. SKU-001"
-                                className="h-8 text-sm"
-                                readOnly={!!selectedPO?.lines?.length}
-                                {...register(`lines.${i}.skuCode`)}
-                              />
-                              {errors.lines?.[i]?.skuCode && <p className="text-[10px] text-destructive">{errors.lines[i].skuCode.message}</p>}
-                            </div>
-                            <div className="space-y-1">
-                              <Label className="text-xs">Qty to Receive {field._remaining != null && <span className="text-muted-foreground">(max {field._remaining})</span>}</Label>
-                              <Input
-                                type="number"
-                                min={1}
-                                max={field._remaining ?? undefined}
-                                className="h-8 text-sm"
-                                {...register(`lines.${i}.quantity`)}
-                              />
-                              {errors.lines?.[i]?.quantity && <p className="text-[10px] text-destructive">{errors.lines[i].quantity.message}</p>}
-                            </div>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">Batch Number</Label>
-                            <Input placeholder="BATCH-2026-001" className="h-8 text-sm font-mono" {...register(`lines.${i}.batchNo`)} />
-                            {errors.lines?.[i]?.batchNo && <p className="text-[10px] text-destructive">{errors.lines[i].batchNo.message}</p>}
-                          </div>
-                          {fields.length > 1 && (
-                            <button type="button" onClick={() => remove(i)} className="absolute top-2 right-2 text-muted-foreground hover:text-destructive transition-colors">
-                              <Trash2 className="size-3.5" />
-                            </button>
-                          )}
-                        </div>
+                        <ReceiveLineItem
+                          key={field.id}
+                          i={i}
+                          field={field}
+                          register={register}
+                          control={control}
+                          setValue={setValue}
+                          errors={errors}
+                          remove={() => remove(i)}
+                          showRemove={fields.length > 1}
+                          selectedPO={selectedPO}
+                          lowStockMap={lowStockMap}
+                        />
                       ))}
                     </div>
                       <SheetFooter>
@@ -713,8 +964,17 @@ export default function InboundPage() {
               ))}
             </SelectContent>
           </Select>
-          {(search || statusFilter !== 'ALL') && (
-            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setSearch(''); setStatusFilter('ALL'); }}>
+          <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+            <SelectTrigger className="h-8 w-36 text-sm"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="ALL">All Priorities</SelectItem>
+              <SelectItem value="P1">P1 — High</SelectItem>
+              <SelectItem value="P2">P2 — Medium</SelectItem>
+              <SelectItem value="P3">P3 — Low</SelectItem>
+            </SelectContent>
+          </Select>
+          {(search || statusFilter !== 'ALL' || priorityFilter !== 'ALL') && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => { setSearch(''); setStatusFilter('ALL'); setPriorityFilter('ALL'); }}>
               <X className="size-3.5 mr-1" /> Clear
             </Button>
           )}
@@ -745,13 +1005,17 @@ export default function InboundPage() {
                   <TableCell className="font-bold font-mono text-primary">{po.poNumber}</TableCell>
                   <TableCell className="font-medium">{po.supplier || '—'}</TableCell>
                   <TableCell>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-                      po.priority === 'P1' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                      po.priority === 'P3' ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' :
-                      'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-                    }`}>
-                      {po.priority ?? 'P2'}
-                    </span>
+                    {po.priority ? (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+                        po.priority === 'P1' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                        po.priority === 'P3' ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' :
+                        'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+                      }`}>
+                        {po.priority}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
                   </TableCell>
                   <TableCell><StatusBadge status={normalizePoStatus(po.status)} /></TableCell>
                   <TableCell className="font-semibold">{po.lineCount ?? po.lines?.length ?? '—'}</TableCell>

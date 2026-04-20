@@ -298,8 +298,28 @@ public class MasterDataController {
             m.put("id",          s.getId());
             m.put("skuCode",     s.getSkuCode());
             m.put("description", s.getDescription());
+            m.put("category",    s.getCategory());
+            m.put("lowStockThreshold", s.getLowStockThreshold());
             return m;
         }).toList());
+    }
+
+    @Operation(summary = "Update SKU category")
+    @PutMapping("/skus/{id}/category")
+    @PreAuthorize("hasAuthority('MASTER_MANAGE')")
+    public ResponseEntity<Map<String, Object>> updateSkuCategory(
+            @PathVariable Long id,
+            @RequestBody Map<String, Object> body) {
+        Sku sku = skuRepository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("SKU not found: " + id));
+        Object val = body.get("category");
+        sku.setCategory(val == null || val.toString().isBlank() ? null : val.toString());
+        skuRepository.save(sku);
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("id", sku.getId());
+        resp.put("skuCode", sku.getSkuCode());
+        resp.put("category", sku.getCategory());
+        return ResponseEntity.ok(resp);
     }
 
     @Operation(summary = "Update bin")

@@ -166,7 +166,7 @@ export default function OrdersPage() {
     <div className="space-y-6">
       <PageHeader
         title="Sales Orders"
-        description="Create and manage B2B customer orders through the fulfilment cycle."
+        description="Create and manage customer orders through the fulfilment cycle."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="outline" onClick={() => exportOrdersToExcel(orders ?? [])}>
@@ -184,7 +184,7 @@ export default function OrdersPage() {
         open={open}
         onOpenChange={(v) => { setOpen(v); if (!v) reset(); }}
         title="New Sales Order"
-        description="Fill in B2B customer details and order lines. Pick tasks are generated automatically."
+        description="Fill in customer details and order lines. Pick tasks are generated automatically."
       >
         <form onSubmit={handleSubmit((d) => createOrder.mutate(d))} className="space-y-5">
 
@@ -269,7 +269,7 @@ export default function OrdersPage() {
         <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Order {detailOrder?.soNumber ?? `#${detailOrder?.id}`}</DialogTitle>
-            <DialogDescription>B2B customer details</DialogDescription>
+            <DialogDescription>Customer Details</DialogDescription>
           </DialogHeader>
           {detailOrder && (
             <div className="space-y-3 text-sm">

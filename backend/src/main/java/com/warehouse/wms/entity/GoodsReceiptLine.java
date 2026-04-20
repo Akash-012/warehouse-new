@@ -28,6 +28,9 @@ public class GoodsReceiptLine {
     @Column(name = "batch_no")
     private String batchNo;
 
+    @Column(name = "expiry_date")
+    private java.time.LocalDate expiryDate;
+
     @Column(name = "quantity_received", nullable = false)
     private Integer quantityReceived;
 }

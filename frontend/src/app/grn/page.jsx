@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
-import { ClipboardList, Eye, FileDown, Search, X } from 'lucide-react';
+import { ClipboardList, Eye, FileDown, Printer, Search, X } from 'lucide-react';
 import PageHeader from '@/components/PageHeader';
 import StatCard from '@/components/StatCard';
 import { Button } from '@/components/ui/button';
@@ -63,7 +63,7 @@ function GrnPrintView({ grn }) {
       <table className="w-full border-collapse text-xs">
         <thead>
           <tr className="bg-gray-100">
-            <th className="border border-gray-300 px-3 py-2 text-left font-semibold">#</th>
+            <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Id</th>
             <th className="border border-gray-300 px-3 py-2 text-left font-semibold">SKU Code</th>
             <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Description</th>
             <th className="border border-gray-300 px-3 py-2 text-left font-semibold">Batch</th>
@@ -211,7 +211,7 @@ function printGrn(grn) {
   </div>
   <table>
     <thead><tr>
-      <th>#</th><th>SKU Code</th><th>Description</th><th>Batch</th>
+      <th>Id</th><th>SKU Code</th><th>Description</th><th>Batch</th>
       <th style="text-align:right">Ordered</th>
       <th style="text-align:right">Received</th>
       <th style="text-align:right">Pending</th>
@@ -245,6 +245,51 @@ function printGrn(grn) {
   win.document.close();
   win.focus();
   setTimeout(() => { win.print(); }, 400);
+}
+
+async function printItemLabels(grnId, grnNo) {
+  let items;
+  try {
+    const res = await api.get(`/inbound/grn/${grnId}/item-barcodes`);
+    items = res.data ?? [];
+  } catch {
+    items = [];
+  }
+  if (!items.length) {
+    alert('No item barcodes found for this GRN.');
+    return;
+  }
+
+  const cards = items.map((item) => {
+    const barcodeUrl = `/api/barcodes/${encodeURIComponent(item.barcode)}.png`;
+    return `<div class="label">
+      <p class="sku">${item.skuCode} — ${item.description || ''}</p>
+      <img src="${barcodeUrl}" alt="${item.barcode}" />
+      <p class="code">${item.barcode}</p>
+      <p class="batch">Batch: ${item.batchNo || '—'}</p>
+    </div>`;
+  }).join('');
+
+  const win = window.open('', '_blank', 'width=900,height=700');
+  win.document.write(`<!DOCTYPE html><html><head><title>Labels — ${grnNo}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;background:#fff;padding:8mm}
+    h2{font-size:14px;margin-bottom:6mm;color:#1e293b}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5mm}
+    .label{border:1px solid #d1d5db;border-radius:4px;padding:4mm;text-align:center;page-break-inside:avoid}
+    .sku{font-size:8px;color:#374151;margin-bottom:2mm;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    img{width:100%;height:48px;object-fit:contain;display:block;margin:0 auto}
+    .code{font-family:monospace;font-size:9px;color:#111;margin-top:2mm;letter-spacing:0.5px}
+    .batch{font-size:7px;color:#6b7280;margin-top:1mm}
+    @media print{@page{margin:8mm;size:A4}button{display:none}}
+  </style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5mm">
+      <h2>Item Labels — ${grnNo} (${items.length} items)</h2>
+      <button onclick="window.print()" style="padding:5px 14px;font-size:12px;cursor:pointer;border:1px solid #ccc;border-radius:4px">Print</button>
+    </div>
+    <div class="grid">${cards}</div>
+  </body></html>`);
+  win.document.close();
 }
 
 export default function GrnPage() {
@@ -341,6 +386,9 @@ export default function GrnPage() {
                       <div className="flex items-center justify-end gap-1">
                         <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setViewGrn(grn)}>
                           <Eye className="size-3 mr-1" /> View
+                        </Button>
+                        <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => printItemLabels(grn.id, grn.grnNo)}>
+                          <Printer className="size-3 mr-1" /> Labels
                         </Button>
                         <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => { setViewGrn(grn); setTimeout(() => printGrn(grn), 100); }}>
                           <FileDown className="size-3 mr-1" /> PDF

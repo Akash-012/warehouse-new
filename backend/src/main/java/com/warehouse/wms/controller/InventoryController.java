@@ -1,7 +1,9 @@
 package com.warehouse.wms.controller;
 
 import com.warehouse.wms.entity.Inventory;
+import com.warehouse.wms.entity.Sku;
 import com.warehouse.wms.repository.InventoryRepository;
+import com.warehouse.wms.repository.SkuRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +21,7 @@ import java.util.Map;
 public class InventoryController {
 
     private final InventoryRepository inventoryRepository;
+    private final SkuRepository skuRepository;
 
     @GetMapping
     public Map<String, Object> list(
@@ -53,6 +56,7 @@ public class InventoryController {
             m.put("serialNo",   i.getSerialNo());
             m.put("quantity",   i.getQuantity());
             m.put("state",      i.getState().name());
+            m.put("expiryDate", i.getExpiryDate());
             m.put("createdAt",  i.getCreatedAt());
             m.put("updatedAt",  i.getUpdatedAt());
             return m;
@@ -76,18 +80,23 @@ public class InventoryController {
         // Aggregate per SKU: collect qty per state
         Map<String, Map<String, Object>> bySkuCode = new java.util.LinkedHashMap<>();
         for (Object[] row : rows) {
-            String skuCode = (String) row[0];
-            String skuName = (String) row[1];
-            String state   = row[2].toString();
-            long   qty     = ((Number) row[3]).longValue();
+            Long   skuId   = ((Number) row[0]).longValue();
+            String skuCode = (String) row[1];
+            String skuName = (String) row[2];
+            String category = (String) row[3];
+            String state   = row[4].toString();
+            long   qty     = ((Number) row[5]).longValue();
 
             Map<String, Object> entry = bySkuCode.computeIfAbsent(skuCode, k -> {
                 Map<String, Object> m = new LinkedHashMap<>();
+                m.put("skuId",         skuId);
                 m.put("skuCode",       skuCode);
                 m.put("skuName",       skuName);
+                m.put("category",      category);
                 m.put("availableQty",  0L);
                 m.put("unavailableQty", 0L);
                 m.put("totalQty",      0L);
+                m.put("lowStockThreshold", row[6]);
                 return m;
             });
 
@@ -101,13 +110,43 @@ public class InventoryController {
             }
         }
 
-        // Add status field: AVAILABLE if availableQty > 0, else UNAVAILABLE
+        // Add status and low-stock fields
         bySkuCode.values().forEach(e -> {
             long avail = ((Number) e.get("availableQty")).longValue();
             e.put("status", avail > 0 ? "AVAILABLE" : "UNAVAILABLE");
+            Integer threshold = e.get("lowStockThreshold") != null
+                    ? ((Number) e.get("lowStockThreshold")).intValue() : null;
+            e.put("isLowStock", threshold != null && avail <= threshold);
         });
 
         return new java.util.ArrayList<>(bySkuCode.values());
+    }
+
+    @PutMapping("/low-stock-threshold/{skuId}")
+    @PreAuthorize("hasAuthority('INVENTORY_ADJUST')")
+    public ResponseEntity<Map<String, Object>> setLowStockThreshold(
+            @PathVariable Long skuId,
+            @RequestBody Map<String, Object> body) {
+        Sku sku = skuRepository.findById(skuId)
+                .orElseThrow(() -> new EntityNotFoundException("SKU not found: " + skuId));
+        Object val = body.get("threshold");
+        sku.setLowStockThreshold(val == null || val.toString().isBlank() ? null
+                : Integer.parseInt(val.toString()));
+        skuRepository.save(sku);
+        Map<String, Object> resp = new LinkedHashMap<>();
+        resp.put("skuId", sku.getId());
+        resp.put("skuCode", sku.getSkuCode());
+        resp.put("lowStockThreshold", sku.getLowStockThreshold());
+        return ResponseEntity.ok(resp);
+    }
+
+
+    @GetMapping("/low-stock-alerts")
+    public List<Map<String, Object>> getLowStockAlerts() {
+        List<Map<String, Object>> summary = stockSummary();
+        return summary.stream()
+                .filter(e -> Boolean.TRUE.equals(e.get("isLowStock")))
+                .toList();
     }
 
     @PostMapping("/adjust")

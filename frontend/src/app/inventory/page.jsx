@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Download, Search, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, X, Sliders, BarChart3, ChevronDown, ChevronUp } from 'lucide-react';
+import { Download, Search, SlidersHorizontal, ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, X, Sliders, BarChart3, ChevronDown, ChevronUp, Bell, BellOff, AlertTriangle } from 'lucide-react';
 import { format } from 'date-fns';
 import PageHeader from '@/components/PageHeader';
 import StatusBadge from '@/components/StatusBadge';
@@ -122,6 +122,9 @@ export default function InventoryPage() {
   const [adjustReason, setAdjustReason] = useState('CYCLE_COUNT');
   const [summaryOpen, setSummaryOpen] = useState(true);
   const [summarySearch, setSummarySearch] = useState('');
+  const [alertItem, setAlertItem] = useState(null);
+  const [alertThreshold, setAlertThreshold] = useState('');
+  const [summaryCategory, setSummaryCategory] = useState('ALL');
 
   const { data: stockSummary, isLoading: summaryLoading } = useQuery({
     queryKey: ['stockSummary'],
@@ -131,15 +134,21 @@ export default function InventoryPage() {
     retry: false,
   });
 
+  const categories = useMemo(() => {
+    const cats = new Set((stockSummary ?? []).map((s) => s.category).filter(Boolean));
+    return Array.from(cats).sort();
+  }, [stockSummary]);
+
   const filteredSummary = useMemo(() => {
-    const list = stockSummary ?? [];
+    let list = stockSummary ?? [];
+    if (summaryCategory !== 'ALL') list = list.filter((s) => s.category === summaryCategory);
     if (!summarySearch.trim()) return list;
     const q = summarySearch.toLowerCase();
     return list.filter((s) =>
       String(s.skuCode ?? '').toLowerCase().includes(q) ||
       String(s.skuName ?? '').toLowerCase().includes(q)
     );
-  }, [stockSummary, summarySearch]);
+  }, [stockSummary, summarySearch, summaryCategory]);
 
   const totalAvailable = useMemo(
     () => (stockSummary ?? []).reduce((sum, s) => sum + Number(s.availableQty ?? 0), 0),
@@ -197,6 +206,23 @@ export default function InventoryPage() {
     },
   });
 
+  const alertMutation = useMutation({
+    mutationFn: ({ skuId, threshold }) =>
+      api.put(`/inventory/low-stock-threshold/${skuId}`, { threshold }),
+    onSuccess: () => {
+      toast.success('Low stock alert updated');
+      queryClient.invalidateQueries({ queryKey: ['stockSummary'] });
+      setAlertItem(null);
+      setAlertThreshold('');
+    },
+    onError: (err) => toast.error(err?.response?.data?.detail || 'Failed to update alert'),
+  });
+
+  const lowStockCount = useMemo(
+    () => (stockSummary ?? []).filter((s) => s.isLowStock).length,
+    [stockSummary]
+  );
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -233,6 +259,12 @@ export default function InventoryPage() {
               <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold px-2 py-0.5">
                 {totalAvailable} available units
               </span>
+              {lowStockCount > 0 && (
+                <span className="rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 text-xs font-semibold px-2 py-0.5 ring-1 ring-inset ring-rose-500/20 inline-flex items-center gap-1">
+                  <AlertTriangle className="size-3" />
+                  {lowStockCount} low stock
+                </span>
+              )}
               {summaryOpen
                 ? <ChevronUp className="size-4 text-muted-foreground" />
                 : <ChevronDown className="size-4 text-muted-foreground" />}
@@ -259,6 +291,13 @@ export default function InventoryPage() {
                   onChange={(e) => setSummarySearch(e.target.value)}
                 />
               </div>
+              <Select value={summaryCategory} onValueChange={setSummaryCategory}>
+                <SelectTrigger className="h-8 w-40 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ALL">All Categories</SelectItem>
+                  {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
               <div className="overflow-hidden rounded-2xl border border-border">
                 <Table>
                   <TableHeader>
@@ -268,22 +307,33 @@ export default function InventoryPage() {
                       <TableHead className="text-right w-28">Available</TableHead>
                       <TableHead className="text-right w-28">Unavailable</TableHead>
                       <TableHead className="text-center w-32">Status</TableHead>
+                      <TableHead className="text-center w-32">Alert Threshold</TableHead>
+                      <TableHead className="text-right w-28">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {summaryLoading ? (
                       [...Array(5)].map((_, i) => (
                         <TableRow key={i}>
-                          {[...Array(5)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
+                          {[...Array(7)].map((__, j) => <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>)}
                         </TableRow>
                       ))
                     ) : filteredSummary.length ? (
                       filteredSummary.map((s) => (
-                        <TableRow key={s.skuCode} className="table-row-hover">
-                          <TableCell className="font-mono font-semibold text-primary">{s.skuCode}</TableCell>
+                        <TableRow key={s.skuCode} className={`table-row-hover ${s.isLowStock ? 'bg-rose-500/5' : ''}`}>
+                          <TableCell className="font-mono font-semibold text-primary">
+                            <span className="inline-flex items-center gap-1.5">
+                              {s.isLowStock && <AlertTriangle className="size-3.5 text-rose-500" />}
+                              {s.skuCode}
+                            </span>
+                          </TableCell>
                           <TableCell className="text-sm">{s.skuName || '—'}</TableCell>
                           <TableCell className="text-right">
-                            <span className="inline-flex items-center justify-center rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 font-bold text-sm px-3 py-0.5 min-w-[2.5rem]">
+                            <span className={`inline-flex items-center justify-center rounded-full font-bold text-sm px-3 py-0.5 min-w-[2.5rem] ${
+                              s.isLowStock
+                                ? 'bg-rose-500/10 text-rose-700 dark:text-rose-400'
+                                : 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                            }`}>
                               {Number(s.availableQty ?? 0).toLocaleString()}
                             </span>
                           </TableCell>
@@ -293,7 +343,12 @@ export default function InventoryPage() {
                             </span>
                           </TableCell>
                           <TableCell className="text-center">
-                            {s.status === 'AVAILABLE' ? (
+                            {s.isLowStock ? (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 text-rose-700 dark:text-rose-400 text-xs font-semibold px-2.5 py-0.5 ring-1 ring-inset ring-rose-500/20">
+                                <span className="size-1.5 rounded-full bg-rose-500" />
+                                Low Stock
+                              </span>
+                            ) : s.status === 'AVAILABLE' ? (
                               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-semibold px-2.5 py-0.5 ring-1 ring-inset ring-emerald-500/20">
                                 <span className="size-1.5 rounded-full bg-emerald-500" />
                                 Available
@@ -305,11 +360,34 @@ export default function InventoryPage() {
                               </span>
                             )}
                           </TableCell>
+                          <TableCell className="text-center">
+                            {s.lowStockThreshold != null ? (
+                              <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                                <Bell className="size-3" />
+                                {s.lowStockThreshold}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 text-xs"
+                              onClick={() => {
+                                setAlertItem(s);
+                                setAlertThreshold(s.lowStockThreshold != null ? String(s.lowStockThreshold) : '');
+                              }}
+                            >
+                              <Bell className="size-3 mr-1" /> Alert
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground text-sm">
+                        <TableCell colSpan={7} className="h-24 text-center text-muted-foreground text-sm">
                           {summarySearch ? 'No products match the filter.' : 'No available stock found.'}
                         </TableCell>
                       </TableRow>
@@ -321,6 +399,57 @@ export default function InventoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Set Low Stock Alert Dialog */}
+      <Dialog open={!!alertItem} onOpenChange={(v) => !v && setAlertItem(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Set Low Stock Alert</DialogTitle>
+            <DialogDescription>
+              Alert when available stock for <span className="font-mono font-semibold">{alertItem?.skuCode}</span> falls at or below this threshold. Leave blank to remove the alert.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1.5">
+              <Label>Threshold Quantity</Label>
+              <Input
+                type="number"
+                min={0}
+                value={alertThreshold}
+                onChange={(e) => setAlertThreshold(e.target.value)}
+                placeholder="e.g. 10 (leave blank to disable)"
+              />
+            </div>
+            {alertItem?.availableQty != null && (
+              <p className="text-xs text-muted-foreground">
+                Current available stock: <span className="font-semibold text-foreground">{Number(alertItem.availableQty).toLocaleString()}</span>
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAlertItem(null)}>Cancel</Button>
+            {alertItem?.lowStockThreshold != null && (
+              <Button
+                variant="ghost"
+                className="text-muted-foreground"
+                disabled={alertMutation.isPending}
+                onClick={() => alertMutation.mutate({ skuId: alertItem.skuId ?? alertItem.id, threshold: null })}
+              >
+                <BellOff className="size-3.5 mr-1" /> Remove Alert
+              </Button>
+            )}
+            <Button
+              disabled={alertMutation.isPending}
+              onClick={() => alertMutation.mutate({
+                skuId: alertItem.skuId ?? alertItem.id,
+                threshold: alertThreshold === '' ? null : Number(alertThreshold),
+              })}
+            >
+              <Bell className="size-3.5 mr-1" /> Save Alert
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Adjust Stock Dialog */}
       <Dialog open={!!adjustItem} onOpenChange={(v) => !v && setAdjustItem(null)}>
@@ -430,6 +559,7 @@ export default function InventoryPage() {
                   <SortableHead field="binBarcode" label="Bin"     sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortableHead field="state"     label="State"    sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <TableHead>Batch</TableHead>
+                  <TableHead>Expiry</TableHead>
                   <SortableHead field="quantity"  label="Qty"      sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <SortableHead field="updatedAt" label="Updated"  sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <TableHead className="text-right">Actions</TableHead>
@@ -439,7 +569,7 @@ export default function InventoryPage() {
                 {isLoading ? (
                   [...Array(8)].map((_, i) => (
                     <TableRow key={i}>
-                      {[...Array(7)].map((__, j) => (
+                      {[...Array(9)].map((__, j) => (
                         <TableCell key={j}><Skeleton className="h-4 w-full" /></TableCell>
                       ))}
                     </TableRow>
@@ -452,6 +582,9 @@ export default function InventoryPage() {
                       <TableCell className="font-mono text-xs font-medium text-primary">{item.binBarcode ?? item.bin ?? '—'}</TableCell>
                       <TableCell><StatusBadge status={item.state} /></TableCell>
                       <TableCell className="text-muted-foreground">{item.batchNo ?? item.batch ?? '—'}</TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {item.expiryDate ? format(new Date(item.expiryDate), 'dd MMM yyyy') : '—'}
+                      </TableCell>
                       <TableCell className="font-semibold">{item.quantity}</TableCell>
                       <TableCell className="text-xs text-muted-foreground whitespace-nowrap">{item.updatedAt ? format(new Date(item.updatedAt), 'dd MMM HH:mm') : '—'}</TableCell>
                       <TableCell className="text-right">
@@ -463,7 +596,7 @@ export default function InventoryPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-40 text-center text-muted-foreground">
+                    <TableCell colSpan={9} className="h-40 text-center text-muted-foreground">
                       No inventory matched the current filters.
                     </TableCell>
                   </TableRow>

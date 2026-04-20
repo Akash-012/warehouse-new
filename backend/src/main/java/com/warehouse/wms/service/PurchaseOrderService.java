@@ -45,7 +45,7 @@ public class PurchaseOrderService {
         po.setSupplier(request.getSupplier());
         po.setExpectedArrivalDate(request.getExpectedArrivalDate());
         po.setStatus("PENDING");
-        po.setPriority(PurchaseOrder.Priority.P2);
+        po.setPriority(request.getPriority() != null ? request.getPriority() : PurchaseOrder.Priority.P2);
         // Save PO first to get ID, then attach lines
         PurchaseOrder saved = purchaseOrderRepository.save(po);
 
@@ -158,11 +158,33 @@ public class PurchaseOrderService {
 
     // ── helpers ───────────────────────────────────────────────────────────────
 
+    private Sku resolveOrCreateSku(CreatePORequest.LineItem item) {
+        if (item.getSkuId() != null) {
+            return skuRepository.findById(item.getSkuId())
+                    .orElseThrow(() -> new EntityNotFoundException("SKU not found: " + item.getSkuId()));
+        }
+        if (item.getProductName() == null || item.getProductName().isBlank()) {
+            throw new IllegalArgumentException("Either skuId or productName is required for each line");
+        }
+        // Auto-generate next available SKU code: SKU-0001, SKU-0002, ...
+        long count = skuRepository.count();
+        String skuCode;
+        do {
+            count++;
+            skuCode = String.format("SKU-%04d", count);
+        } while (skuRepository.findBySkuCode(skuCode).isPresent());
+
+        Sku sku = new Sku();
+        sku.setSkuCode(skuCode);
+        sku.setDescription(item.getProductName().trim());
+        sku.setCategory(item.getCategory() != null && !item.getCategory().isBlank() ? item.getCategory().trim() : null);
+        return skuRepository.save(sku);
+    }
+
     private List<PurchaseOrderLine> buildLines(PurchaseOrder po, List<CreatePORequest.LineItem> items) {
         List<PurchaseOrderLine> lines = new ArrayList<>();
         for (CreatePORequest.LineItem item : items) {
-            Sku sku = skuRepository.findById(item.getSkuId())
-                    .orElseThrow(() -> new EntityNotFoundException("SKU not found: " + item.getSkuId()));
+            Sku sku = resolveOrCreateSku(item);
             PurchaseOrderLine line = new PurchaseOrderLine();
             line.setPurchaseOrder(po);
             line.setSku(sku);
